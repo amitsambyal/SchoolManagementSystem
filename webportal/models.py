@@ -1,4 +1,5 @@
 from django.db import models
+from django.core.exceptions import ValidationError
 
 # Create your models here.
 class favicon(models.Model):
@@ -30,11 +31,17 @@ class SchoolFacility(models.Model):
     description = models.TextField(help_text="Description of the facility")
     icon_class = models.CharField(max_length=255, help_text="FontAwesome icon class for the facility")
     background_color = models.CharField(max_length=20, choices=[
-        ('bg-primary', 'Primary'),
-        ('bg-success', 'Success'),
-        ('bg-warning', 'Warning'),
-        ('bg-info', 'Info'),
+        ('primary', 'Primary'),
+        ('success', 'Success'),
+        ('warning', 'Warning'),
+        ('info', 'Info'),
     ], help_text="Background color for the facility item.")
+    
+    def clean(self):
+        # Split the description into words and count them
+        words = self.description.split()
+        if len(words) > 15:
+            raise ValidationError('Description cannot have more than 15 words.')
     
     def __str__(self):
         return self.name
