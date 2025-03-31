@@ -83,8 +83,7 @@ class Teacher(models.Model):
     
     def __str__(self):
         return self.name
-
-
+    
 class SchoolClass(models.Model):
     class_name = models.CharField(max_length=255, help_text="The name of the class (e.g., 'Art & Drawing')")
     class_image = models.ImageField(upload_to='class_images/', help_text="Image representing the class")
@@ -126,6 +125,12 @@ class Testimonial(models.Model):
     profession = models.CharField(max_length=255)
     message = models.TextField()
     profile_picture = models.ImageField(upload_to='testimonials/', blank=True, null=True)
+    
+    def clean(self):
+        # Validate that the message contains no more than 40 words
+        word_count = len(self.message.split())
+        if word_count > 40:
+            raise ValidationError("The message cannot exceed 40 words.")
 
     def __str__(self):
         return f"Testimonial from {self.client_name}"

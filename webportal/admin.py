@@ -22,6 +22,7 @@ admin.site.register(TeamMember)
 admin.site.register(Testimonial)    
 admin.site.register(FooterSocialLink)
 admin.site.register(FooterNewsletter)
+
   
 
 

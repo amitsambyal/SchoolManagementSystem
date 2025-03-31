@@ -9,11 +9,22 @@ def index(request):
     schoolfacility=SchoolFacility.objects.all()
     aboutus=AboutUs.objects.all()
     calltoaction=CallToAction.objects.all()
+    #favicon=favicon.objects.all()
+    #logo=logo.objects.all()
+    schoolclass=SchoolClass.objects.all()
+    teacher=Teacher.objects.all()
+    appointment=Appointment.objects.all()
+    teamMember=TeamMember.objects.all()
+    testimonial=Testimonial.objects.all()
+    footerNewsletter=FooterNewsletter.objects.all()
+    footerSocialLink=FooterSocialLink.objects.all()
    
     
     
     content={'carouselItem':carouselItem, 'schoolfacility': schoolfacility, 'aboutus':aboutus, \
-             'calltoaction':calltoaction}
+             'calltoaction':calltoaction, 'favicon':favicon , 'logo':logo, 'schoolclass':schoolclass, 'teacher':teacher, \
+                 'appointment':appointment,'teammember':teamMember ,'testimonial': testimonial,'footerNewsletter':FooterNewsletter, \
+                     'footerSocialLink':footerSocialLink }
     return render(request,'webportal/index.html',content)
 
 def about(request):
