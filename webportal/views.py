@@ -9,8 +9,8 @@ def index(request):
     schoolfacility=SchoolFacility.objects.all()
     aboutus=AboutUs.objects.all()
     calltoaction=CallToAction.objects.all()
-    #favicon=favicon.objects.all()
-    #logo=logo.objects.all()
+    favicon1=favicon.objects.all()
+    logo1=logo.objects.all()
     schoolclass=SchoolClass.objects.all()
     teacher=Teacher.objects.all()
     appointment=Appointment.objects.all()
@@ -22,7 +22,7 @@ def index(request):
     
     
     content={'carouselItem':carouselItem, 'schoolfacility': schoolfacility, 'aboutus':aboutus, \
-             'calltoaction':calltoaction, 'favicon':favicon , 'logo':logo, 'schoolclass':schoolclass, 'teacher':teacher, \
+             'calltoaction':calltoaction, 'favicon1':favicon1 , 'logo1':logo1, 'schoolclass':schoolclass, 'teacher':teacher, \
                  'appointment':appointment,'teammember':teamMember ,'testimonial': testimonial,'footerNewsletter':FooterNewsletter, \
                      'footerSocialLink':footerSocialLink }
     return render(request,'webportal/index.html',content)

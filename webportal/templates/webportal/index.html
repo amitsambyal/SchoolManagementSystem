@@ -11,7 +11,8 @@
     <meta content="" name="description">
 
     <!-- Favicon -->
-    <link href="{% static 'webportal/img/favicon.ico' %}" rel="icon">
+    <!--<link href="{% static 'webportal/img/favicon.ico' %}" rel="icon"> -->
+    <link href="{% if favicon1.first.favicon %} {{favicon1.first.favicon.url}}{% else %}{% static 'webportal/img/favicon.ico' %}{% endif %}" rel="icon">
 
     <!-- Google Web Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -47,7 +48,7 @@
         <!-- Navbar Start -->
         <nav class="navbar navbar-expand-lg bg-white navbar-light sticky-top px-4 px-lg-5 py-lg-0">
             <a href="/" class="navbar-brand">
-                <h1 class="m-0 text-primary"><i class="fa fa-book-reader me-3"></i>Angels School</h1>
+                <h1 class="m-0 text-info">{% if logo1.first.logo %}<img src="{{logo1.first.logo.url}}" alt="School Logo" style="height: 70px;">{% endif %}Angels School</h1>
             </a>
             <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarCollapse">
                 <span class="navbar-toggler-icon"></span>
@@ -55,19 +56,19 @@
             <div class="collapse navbar-collapse" id="navbarCollapse">
                 <div class="navbar-nav mx-auto">
                     <a href="/" class="nav-item nav-link active">Home</a>
-                    <a href="about.html" class="nav-item nav-link">About Us</a>
-                    <a href="classes.html" class="nav-item nav-link">Classes</a>
+                    <a href="#" class="nav-item nav-link">About Us</a>
+                    <a href="#" class="nav-item nav-link">Classes</a>
                     <div class="nav-item dropdown">
                         <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown">Pages</a>
                         <div class="dropdown-menu rounded-0 rounded-bottom border-0 shadow-sm m-0">
-                            <a href="facility.html" class="dropdown-item">School Facilities</a>
-                            <a href="team.html" class="dropdown-item">Popular Teachers</a>
-                            <a href="call-to-action.html" class="dropdown-item">Become A Teachers</a>
-                            <a href="appointment.html" class="dropdown-item">Make Appointment</a>
-                            <a href="testimonial.html" class="dropdown-item">Testimonial</a>
+                            <a href="#" class="dropdown-item">School Facilities</a>
+                            <a href="#" class="dropdown-item">Popular Teachers</a>
+                            <a href="#" class="dropdown-item">Become A Teachers</a>
+                            <a href="#" class="dropdown-item">Make Appointment</a>
+                            <a href="#" class="dropdown-item">Testimonial</a>
                         </div>
                     </div>
-                    <a href="contact.html" class="nav-item nav-link">Contact Us</a>
+                    <a href="#" class="nav-item nav-link">Contact Us</a>
                 </div>
                 <a href="" class="btn btn-primary rounded-pill px-3 d-none d-lg-block">Join Us<i class="fa fa-arrow-right ms-3"></i></a>
             </div>
@@ -400,23 +401,54 @@
                         <h3 class="text-white mb-4">Photo Gallery</h3>
                         <div class="row g-2 pt-2">
                             <div class="col-4">
-                                <img class="img-fluid rounded bg-light p-1" src="{% static 'webportal/img/classes-1.jpg' %}" alt="">
+                                <img class="img-fluid rounded bg-light p-1" src="{% static 'webportal/img/classes-1.jpg' %}" alt="" onclick="openModal(this.src)">
                             </div>
                             <div class="col-4">
-                                <img class="img-fluid rounded bg-light p-1" src="{% static 'webportal/img/classes-2.jpg' %}" alt="">
+                                <img class="img-fluid rounded bg-light p-1" src="{% static 'webportal/img/classes-2.jpg' %}" alt="" onclick="openModal(this.src)">
                             </div>
                             <div class="col-4">
-                                <img class="img-fluid rounded bg-light p-1" src="{% static 'webportal/img/classes-3.jpg' %}" alt="">
+                                <img class="img-fluid rounded bg-light p-1" src="{% static 'webportal/img/classes-3.jpg' %}" alt="" onclick="openModal(this.src)">
                             </div>
                             <div class="col-4">
-                                <img class="img-fluid rounded bg-light p-1" src="{% static 'webportal/img/classes-4.jpg' %}" alt="">
+                                <img class="img-fluid rounded bg-light p-1" src="{% static 'webportal/img/classes-4.jpg' %}" alt="" onclick="openModal(this.src)">
                             </div>
                             <div class="col-4">
-                                <img class="img-fluid rounded bg-light p-1" src="{% static 'webportal/img/classes-5.jpg' %}" alt="">
+                                <img class="img-fluid rounded bg-light p-1" src="{% static 'webportal/img/classes-5.jpg' %}" alt="" onclick="openModal(this.src)">
                             </div>
                             <div class="col-4">
-                                <img class="img-fluid rounded bg-light p-1" src="{% static 'webportal/img/classes-6.jpg' %}" alt="">
+                                <img class="img-fluid rounded bg-light p-1" src="{% static 'webportal/img/classes-6.jpg' %}" alt="" onclick="openModal(this.src)">
                             </div>
+                        </div>
+                        <!-- Modal -->
+                        <div class="modal" id="imageModal" tabindex="-1" role="dialog">
+                            <div class="modal-dialog" role="document">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Image</h5>
+                                        <button type="button" class="close" data-dismiss="modal" aria-label="Close" onclick="closeModal()">
+                                            <span aria-hidden="true">&times;</span>
+                                        </button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <img id="modalImage" src="" alt="Modal Image" class="img-fluid">
+                                        <p class="text-center">Click to view photo <i class="fa fa-hand-pointer-o"></i></p>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" onclick="prevImage()">&#10094; Previous</button>
+                                            <button type="button" class="btn btn-secondary" onclick="nextImage()">Next &#10095;</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <script>
+                            function openModal(src) {
+                                document.getElementById('modalImage').src = src;
+                                document.getElementById('imageModal').style.display = 'block';
+                            }
+                            function closeModal() {
+                                document.getElementById('imageModal').style.display = 'none';
+                            }
+                        </script>
                         </div>
                     </div>
                     <div class="col-lg-3 col-md-6">

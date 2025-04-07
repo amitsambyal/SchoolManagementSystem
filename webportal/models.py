@@ -6,12 +6,15 @@ class favicon(models.Model):
     favicon=models.ImageField(upload_to='icon')
     appletouchicon=models.ImageField(upload_to='icon')
     
+    def __str__(self):
+        return str(self.favicon)
+    
 class logo(models.Model):
     logo= models.ImageField(upload_to='logo')
     logo_text=models.CharField(max_length=100,default='')    
     
-    #def _str_(self):
-       # return f"{self.logo, self.logo.text}"   
+    def __str__(self):
+       return str(self.logo)   
        
 class CarouselItem(models.Model):
     image = models.ImageField(upload_to='carousel_images/', help_text="Upload the image for the carousel item.")
