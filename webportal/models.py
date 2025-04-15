@@ -152,3 +152,71 @@ class FooterNewsletter(models.Model):
 
     def __str__(self):
         return self.email
+
+# New models for attendance, timetable, and homework management
+
+class Student(models.Model):
+    name = models.CharField(max_length=255)
+    age = models.IntegerField()
+    date_of_birth = models.DateField(null=True, blank=True)
+    gender_choices = [
+        ('male', 'Male'),
+        ('female', 'Female'),
+        ('other', 'Other'),
+    ]
+    gender = models.CharField(max_length=10, choices=gender_choices, null=True, blank=True)
+    address = models.TextField(null=True, blank=True)
+    parent_guardian_name = models.CharField(max_length=255, null=True, blank=True)
+    parent_guardian_contact = models.CharField(max_length=20, null=True, blank=True)
+    email = models.EmailField(null=True, blank=True)
+    image = models.ImageField(upload_to='student_images/', null=True, blank=True)
+    school_class = models.ForeignKey('SchoolClass', on_delete=models.CASCADE, related_name='students')
+
+    def __str__(self):
+        return self.name
+
+class Attendance(models.Model):
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='attendances')
+    date = models.DateField()
+    status_choices = [
+        ('present', 'Present'),
+        ('absent', 'Absent'),
+        ('late', 'Late'),
+        ('excused', 'Excused'),
+    ]
+    status = models.CharField(max_length=10, choices=status_choices, default='present')
+
+    class Meta:
+        unique_together = ('student', 'date')
+
+    def __str__(self):
+        return f"{self.student.name} - {self.date} - {self.status}"
+
+class Timetable(models.Model):
+    school_class = models.ForeignKey('SchoolClass', on_delete=models.CASCADE, related_name='timetables')
+    day = models.CharField(max_length=10, choices=[
+        ('Monday', 'Monday'),
+        ('Tuesday', 'Tuesday'),
+        ('Wednesday', 'Wednesday'),
+        ('Thursday', 'Thursday'),
+        ('Friday', 'Friday'),
+        ('Saturday', 'Saturday'),
+    ])
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    subject = models.CharField(max_length=255)
+
+    class Meta:
+        unique_together = ('school_class', 'day', 'start_time')
+
+    def __str__(self):
+        return f"{self.school_class.class_name} - {self.day} {self.start_time.strftime('%H:%M')} - {self.subject}"
+
+class Homework(models.Model):
+    school_class = models.ForeignKey('SchoolClass', on_delete=models.CASCADE, related_name='homeworks')
+    assigned_date = models.DateField()
+    due_date = models.DateField()
+    description = models.TextField()
+
+    def __str__(self):
+        return f"Homework for {self.school_class.class_name} due {self.due_date}"
