@@ -78,17 +78,40 @@ class CallToAction(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.title  
+        return self.title      
+
     
+class Subject(models.Model):
+    name = models.CharField(max_length=255)
+    school_class = models.ForeignKey('SchoolClass', on_delete=models.CASCADE, related_name='subjects')
+
+    def __str__(self):
+        return f"{self.name} ({self.school_class.class_name})"
+    
+
 class Teacher(models.Model):
     name = models.CharField(max_length=255)
     profile_picture = models.ImageField(upload_to='teacher_profiles/', help_text="Teacher's profile picture")
-    
+    subject_expert = models.ManyToManyField('Subject', related_name='expert_teachers', blank=True)
+
     def __str__(self):
         return self.name
-    
+
+class TeamMember(models.Model):
+    teacher = models.ForeignKey(Teacher, on_delete=models.SET_NULL, null=True, blank=True, related_name='team_members')
+    designation = models.CharField(max_length=255)
+    facebook_url = models.URLField(blank=True, null=True)
+    twitter_url = models.URLField(blank=True, null=True)
+    instagram_url = models.URLField(blank=True, null=True)
+    profile_picture = models.ImageField(upload_to='team_profiles/', blank=True, null=True)
+
+    def __str__(self):
+        if self.teacher:
+            return self.teacher.name
+        return "Team Member"
+
 class SchoolClass(models.Model):
-    class_name = models.CharField(max_length=255, help_text="The name of the class (e.g., 'Art & Drawing')")
+    class_name = models.CharField(max_length=255, help_text="The name of the class (e.g., 'Class1,Class2')")
     class_image = models.ImageField(upload_to='class_images/', help_text="Image representing the class")
     teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name="classes", help_text="The teacher for the class")
     age_group = models.CharField(max_length=50, help_text="Age group for the class (e.g., '3-5 Years')")
@@ -109,18 +132,7 @@ class Appointment(models.Model):
 
     def __str__(self):
         return f"Appointment for {self.child_name} by {self.guardian_name}"
-
-
-class TeamMember(models.Model):
-    full_name = models.CharField(max_length=255)
-    designation = models.CharField(max_length=255)
-    facebook_url = models.URLField(blank=True, null=True)
-    twitter_url = models.URLField(blank=True, null=True)
-    instagram_url = models.URLField(blank=True, null=True)
-    profile_picture = models.ImageField(upload_to='team_profiles/', blank=True, null=True)
-
-    def __str__(self):
-        return self.full_name          
+     
     
 # Testimonial Model
 class Testimonial(models.Model):
@@ -156,6 +168,7 @@ class FooterNewsletter(models.Model):
 # New models for attendance, timetable, and homework management
 
 class Student(models.Model):
+    roll_no = models.CharField(max_length=20, null=True, blank=True)
     name = models.CharField(max_length=255)
     age = models.IntegerField()
     date_of_birth = models.DateField(null=True, blank=True)
@@ -171,6 +184,9 @@ class Student(models.Model):
     email = models.EmailField(null=True, blank=True)
     image = models.ImageField(upload_to='student_images/', null=True, blank=True)
     school_class = models.ForeignKey('SchoolClass', on_delete=models.CASCADE, related_name='students')
+
+    class Meta:
+        unique_together = ('roll_no', 'school_class')
 
     def __str__(self):
         return self.name
@@ -192,6 +208,7 @@ class Attendance(models.Model):
     def __str__(self):
         return f"{self.student.name} - {self.date} - {self.status}"
 
+
 class Timetable(models.Model):
     school_class = models.ForeignKey('SchoolClass', on_delete=models.CASCADE, related_name='timetables')
     day = models.CharField(max_length=10, choices=[
@@ -204,16 +221,17 @@ class Timetable(models.Model):
     ])
     start_time = models.TimeField()
     end_time = models.TimeField()
-    subject = models.CharField(max_length=255)
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='timetables')
 
     class Meta:
         unique_together = ('school_class', 'day', 'start_time')
 
     def __str__(self):
-        return f"{self.school_class.class_name} - {self.day} {self.start_time.strftime('%H:%M')} - {self.subject}"
+        return f"{self.school_class.class_name} - {self.day} {self.start_time.strftime('%H:%M')} - {self.subject.name}"
 
 class Homework(models.Model):
     school_class = models.ForeignKey('SchoolClass', on_delete=models.CASCADE, related_name='homeworks')
+    subject = models.ForeignKey('Subject', on_delete=models.CASCADE, related_name='homeworks', null=True, blank=True)
     assigned_date = models.DateField()
     due_date = models.DateField()
     description = models.TextField()
