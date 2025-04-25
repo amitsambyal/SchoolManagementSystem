@@ -1,5 +1,7 @@
 from django.db import models
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from datetime import date
 
 # Create your models here.
 class favicon(models.Model):
@@ -66,7 +68,7 @@ class AboutUs(models.Model):
 
     def __str__(self):
         return self.title   
-    
+        
 class CallToAction(models.Model):
     title = models.CharField(max_length=200, help_text="Title for the Call to Action section")
     description = models.TextField(help_text="Description for the Call to Action section")
@@ -90,6 +92,7 @@ class Subject(models.Model):
     
 
 class Teacher(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True, related_name='teacher_profile')
     name = models.CharField(max_length=255)
     profile_picture = models.ImageField(upload_to='teacher_profiles/', help_text="Teacher's profile picture")
     subject_expert = models.ManyToManyField('Subject', related_name='expert_teachers', blank=True)
@@ -170,7 +173,7 @@ class FooterNewsletter(models.Model):
 class Student(models.Model):
     roll_no = models.CharField(max_length=20, null=True, blank=True)
     name = models.CharField(max_length=255)
-    age = models.IntegerField()
+    phone_no = models.CharField(max_length=20, null=True, blank=True)  # New phone number field
     date_of_birth = models.DateField(null=True, blank=True)
     gender_choices = [
         ('male', 'Male'),
@@ -190,6 +193,14 @@ class Student(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def age(self):
+        if self.date_of_birth:
+            today = date.today()
+            age = today.year - self.date_of_birth.year - ((today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day))
+            return age
+        return None
 
 class Attendance(models.Model):
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='attendances')
