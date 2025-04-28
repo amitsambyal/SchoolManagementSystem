@@ -1,5 +1,10 @@
 from django.db import models
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from datetime import date
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from django.core.mail import send_mail
 
 # Create your models here.
 class favicon(models.Model):
@@ -66,7 +71,7 @@ class AboutUs(models.Model):
 
     def __str__(self):
         return self.title   
-    
+        
 class CallToAction(models.Model):
     title = models.CharField(max_length=200, help_text="Title for the Call to Action section")
     description = models.TextField(help_text="Description for the Call to Action section")
@@ -93,9 +98,58 @@ class Teacher(models.Model):
     name = models.CharField(max_length=255)
     profile_picture = models.ImageField(upload_to='teacher_profiles/', help_text="Teacher's profile picture")
     subject_expert = models.ManyToManyField('Subject', related_name='expert_teachers', blank=True)
+    email = models.EmailField(unique=True,default='')  # Add email field
+    mobile = models.CharField(max_length=20, unique=True,default='')  # Add mobile field
 
     def __str__(self):
         return self.name
+
+@receiver(post_save, sender=Teacher)
+def create_teacher_user(sender, instance, created, **kwargs):
+    """
+    This function is a signal receiver that creates a corresponding user for a new Teacher instance.
+    It generates a unique username based on the teacher's name and creates a new user with that username and a default password.
+    The newly created user is then associated with the Teacher instance.
+
+    Parameters:
+    sender (class): The model class sending the signal. In this case, it is the Teacher model.
+    instance (Teacher): The instance of the Teacher model that triggered the signal.
+    created (bool): A boolean indicating whether the Teacher instance was created (True) or updated (False).
+    kwargs (dict): Additional keyword arguments passed to the signal handler.
+
+    Returns:
+    None
+    """
+    if created:
+        username = instance.name.lower().replace(' ', '')  # Generate a unique username based on the teacher's name
+        count = 1
+        while User.objects.filter(username=username).exists():
+            username = f"{username}{count}"
+            count += 1
+        user = User.objects.create_user(username=username, password='password123')
+        instance.user = user
+        instance.save()
+
+@receiver(post_save, sender=Teacher)
+def send_welcome_email(sender, instance, created, **kwargs):
+    """
+    This function is a signal receiver that sends a welcome email to the teacher when a new Teacher instance is created.
+    It generates a unique username based on the teacher's name and creates a new user with that username and a default password.
+    The newly created user is then associated with the Teacher instance.
+
+    Parameters:
+    sender (class): The model class sending the signal. In this case, it is the Teacher model.
+    instance (Teacher): The instance of the Teacher model that triggered the signal.
+    created (bool): A boolean indicating whether the Teacher instance was created (True) or updated (False).
+    kwargs (dict): Additional keyword arguments passed to the signal handler.
+
+    Returns:
+    None
+    """
+    if created:
+        subject = "Welcome to our school!"
+        message = f"Dear {instance.name},\n\nWelcome to our school! We are excited to have you as a teacher.\n\nYour email: {instance.email}\nYour mobile: {instance.mobile}\n\nPlease keep this information confidential.\n\nThank you!"
+        send_mail(subject, message, 'amitsambyal59@gmail.com', [instance.email])
 
 class TeamMember(models.Model):
     teacher = models.ForeignKey(Teacher, on_delete=models.SET_NULL, null=True, blank=True, related_name='team_members')
@@ -113,7 +167,7 @@ class TeamMember(models.Model):
 class SchoolClass(models.Model):
     class_name = models.CharField(max_length=255, help_text="The name of the class (e.g., 'Class1,Class2')")
     class_image = models.ImageField(upload_to='class_images/', help_text="Image representing the class")
-    teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name="classes", help_text="The teacher for the class")
+   # teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name="classes", help_text="The teacher for the class")
     age_group = models.CharField(max_length=50, help_text="Age group for the class (e.g., '3-5 Years')")
     time = models.CharField(max_length=50, help_text="Time when the class is held (e.g., '9-10 AM')")
     capacity = models.IntegerField(help_text="Maximum capacity of students in the class")
@@ -170,7 +224,7 @@ class FooterNewsletter(models.Model):
 class Student(models.Model):
     roll_no = models.CharField(max_length=20, null=True, blank=True)
     name = models.CharField(max_length=255)
-    age = models.IntegerField()
+    phone_no = models.CharField(max_length=20, null=True, blank=True)  # New phone number field
     date_of_birth = models.DateField(null=True, blank=True)
     gender_choices = [
         ('male', 'Male'),
@@ -190,6 +244,14 @@ class Student(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def age(self):
+        if self.date_of_birth:
+            today = date.today()
+            age = today.year - self.date_of_birth.year - ((today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day))
+            return age
+        return None
 
 class Attendance(models.Model):
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='attendances')

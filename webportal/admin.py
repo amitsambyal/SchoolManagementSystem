@@ -2,6 +2,8 @@ from django.contrib import admin
 from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
+from django import forms
 from .models import favicon, logo, CarouselItem, SchoolClass, SchoolFacility, AboutUs, CallToAction, Teacher, Appointment, TeamMember, Testimonial, FooterNewsletter, FooterSocialLink, Student, Attendance, Timetable, Homework, Subject
 
 admin.site.site_header = "School Management System"
@@ -25,18 +27,66 @@ admin.site.register(Testimonial)
 admin.site.register(FooterSocialLink)
 admin.site.register(FooterNewsletter)
 
+class StudentAdminForm(forms.ModelForm):
+    class Meta:
+        model = Student
+        fields = '__all__'
+
+    class Media:
+        js = ('webportal/js/student_admin.js',)
+
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
-    list_display = ('name', 'roll_no', 'age', 'school_class', 'image_tag')
+    form = StudentAdminForm
+    list_display = ('name', 'roll_no', 'phone_no', 'age_display', 'school_class', 'image_tag')
     readonly_fields = ('image_tag',)
     list_filter = ('school_class',)
     search_fields = ('name', 'roll_no')
 
+    fieldsets = (
+        ('Personal Information', {
+            'fields': ('name', 'roll_no', 'phone_no', 'date_of_birth', 'gender', 'image', 'image_tag')
+        }),
+        ('Contact Information', {
+            'fields': ('address', 'parent_guardian_name', 'parent_guardian_contact', 'email')
+        }),
+        ('Academic Information', {
+            'fields': ('school_class',)
+        }),
+    )
+
     def image_tag(self, obj):
         if obj.image:
-            return format_html('<img src="{}" width="100" height="100" />'.format(obj.image.url))
+            return format_html('<img src="{}" width="100" height="100" />', obj.image.url)
         return "-"
     image_tag.short_description = 'Image'
+
+    def age_display(self, obj):
+        return obj.age
+    age_display.short_description = 'Age'
+
+@admin.register(Attendance)
+class AttendanceAdmin(admin.ModelAdmin):
+    list_display = ('student', 'date', 'status')
+    list_filter = ('status', 'date')
+    search_fields = ('student__name',)
+
+@admin.register(Timetable)
+class TimetableAdmin(admin.ModelAdmin):
+    list_display = ('school_class', 'day', 'start_time', 'end_time', 'subject')
+    list_filter = ('day', 'school_class')
+    search_fields = ('school_class__class_name', 'subject__name')
+
+@admin.register(Homework)
+class HomeworkAdmin(admin.ModelAdmin):
+    list_display = ('school_class', 'subject', 'assigned_date', 'due_date')
+    list_filter = ('assigned_date', 'due_date', 'school_class')
+    search_fields = ('school_class__class_name', 'subject__name')
+
+@admin.register(Subject)
+class SubjectAdmin(admin.ModelAdmin):
+    list_display = ('name', 'school_class')
+    search_fields = ('name', 'school_class__class_name')
 
 # Custom UserAdmin to set default password
 class UserAdmin(BaseUserAdmin):
