@@ -5,6 +5,9 @@ from datetime import date
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.core.mail import send_mail
+from ckeditor.fields import RichTextField
+import random
+import string
 
 # Create your models here.
 class favicon(models.Model):
@@ -95,62 +98,38 @@ class Subject(models.Model):
     
 
 class Teacher(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='teacher_profile', null=True, blank=True)
     name = models.CharField(max_length=255)
     profile_picture = models.ImageField(upload_to='teacher_profiles/', help_text="Teacher's profile picture")
     subject_expert = models.ManyToManyField('Subject', related_name='expert_teachers', blank=True)
-    email = models.EmailField(unique=True,default='')  # Add email field
-    mobile = models.CharField(max_length=20, unique=True,default='')  # Add mobile field
+    email = models.EmailField(unique=True)
+    mobile = models.CharField(max_length=20, unique=True)
 
     def __str__(self):
         return self.name
 
-@receiver(post_save, sender=Teacher)
-def create_teacher_user(sender, instance, created, **kwargs):
-    """
-    This function is a signal receiver that creates a corresponding user for a new Teacher instance.
-    It generates a unique username based on the teacher's name and creates a new user with that username and a default password.
-    The newly created user is then associated with the Teacher instance.
+    def save(self, *args, **kwargs):
+        creating = self._state.adding
+        super().save(*args, **kwargs)
+        if creating:
+            self.create_user_account()
 
-    Parameters:
-    sender (class): The model class sending the signal. In this case, it is the Teacher model.
-    instance (Teacher): The instance of the Teacher model that triggered the signal.
-    created (bool): A boolean indicating whether the Teacher instance was created (True) or updated (False).
-    kwargs (dict): Additional keyword arguments passed to the signal handler.
-
-    Returns:
-    None
-    """
-    if created:
-        username = instance.name.lower().replace(' ', '')  # Generate a unique username based on the teacher's name
-        count = 1
-        while User.objects.filter(username=username).exists():
-            username = f"{username}{count}"
-            count += 1
-        user = User.objects.create_user(username=username, password='password123')
-        instance.user = user
-        instance.save()
+    def create_user_account(self):
+        if not self.user:
+            username = self.email.split('@')[0]
+            password = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
+            user = User.objects.create_user(username=username, email=self.email, password=password)
+            self.user = user
+            self.save()
+            # Here you might want to send an email to the teacher with their login credentials
+            print(f"User account created for {self.name}. Username: {username}, Password: {password}")
 
 @receiver(post_save, sender=Teacher)
-def send_welcome_email(sender, instance, created, **kwargs):
-    """
-    This function is a signal receiver that sends a welcome email to the teacher when a new Teacher instance is created.
-    It generates a unique username based on the teacher's name and creates a new user with that username and a default password.
-    The newly created user is then associated with the Teacher instance.
-
-    Parameters:
-    sender (class): The model class sending the signal. In this case, it is the Teacher model.
-    instance (Teacher): The instance of the Teacher model that triggered the signal.
-    created (bool): A boolean indicating whether the Teacher instance was created (True) or updated (False).
-    kwargs (dict): Additional keyword arguments passed to the signal handler.
-
-    Returns:
-    None
-    """
-    if created:
-        subject = "Welcome to our school!"
-        message = f"Dear {instance.name},\n\nWelcome to our school! We are excited to have you as a teacher.\n\nYour email: {instance.email}\nYour mobile: {instance.mobile}\n\nPlease keep this information confidential.\n\nThank you!"
-        send_mail(subject, message, 'amitsambyal59@gmail.com', [instance.email])
-
+def update_user_account(sender, instance, created, **kwargs):
+    if not created and instance.user:
+        instance.user.email = instance.email
+        instance.user.save()
+        
 class TeamMember(models.Model):
     teacher = models.ForeignKey(Teacher, on_delete=models.SET_NULL, null=True, blank=True, related_name='team_members')
     designation = models.CharField(max_length=255)
@@ -300,3 +279,22 @@ class Homework(models.Model):
 
     def __str__(self):
         return f"Homework for {self.school_class.class_name} due {self.due_date}"
+
+class Syllabus(models.Model):
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='syllabi')
+    teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name='syllabi')
+    title = models.CharField(max_length=255, help_text="Title of the syllabus section")
+    content = RichTextField(help_text="Detailed content of the syllabus")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name_plural = "Syllabi"
+        unique_together = ('subject', 'title')
+
+    def __str__(self):
+        return f"{self.subject.name} Syllabus: {self.title}"
+
+    def clean(self):
+        if not self.teacher.subject_expert.filter(id=self.subject.id).exists():
+            raise ValidationError("You can only add syllabus for subjects you are an expert in.")
