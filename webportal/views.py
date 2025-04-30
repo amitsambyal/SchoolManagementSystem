@@ -1,6 +1,6 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from .models import favicon, logo, CarouselItem, SchoolClass, SchoolFacility, AboutUs, CallToAction, \
-      Teacher, Appointment, TeamMember, Testimonial, FooterNewsletter, FooterSocialLink
+      Teacher, Appointment, TeamMember, Testimonial, FooterNewsletter, FooterSocialLink, SchoolClass, Syllabus
 from django.contrib.auth import login
 from django.contrib.auth.views import LoginView
 from django.shortcuts import redirect
@@ -23,6 +23,11 @@ def index(request):
     footerNewsletter = FooterNewsletter.objects.all()
     footerSocialLink = FooterSocialLink.objects.all()
 
+    # Prepare subjects grouped by class
+    subjects_by_class = {}
+    for school_class in schoolclass:
+        subjects_by_class[school_class.id] = school_class.subjects.all()
+
     content = {
         'carouselItem': carouselItem,
         'schoolfacility': schoolfacility,
@@ -31,6 +36,7 @@ def index(request):
         'favicon1': favicon1,
         'logo1': logo1,
         'schoolclass': schoolclass,
+        'subjects_by_class': subjects_by_class,
         'teacher': teacher,
         'appointment': appointment,
         'teammember': teamMember,
@@ -56,3 +62,22 @@ class CustomLoginView(LoginView):
             # Redirect to password change page
             return redirect('password_change')  # Ensure this URL name matches your password change view
         return super().form_valid(form)
+
+def syllabus_list(request, class_id):
+    school_class = get_object_or_404(SchoolClass, id=class_id)
+    syllabi = Syllabus.objects.filter(subject__school_class=school_class).order_by('subject__name', 'title')
+    context = {
+        'school_class': school_class,
+        'syllabi': syllabi,
+    }
+    return render(request, 'webportal/syllabus_list.html', context)
+
+def syllabus_by_subject(request, subject_id):
+    subject = get_object_or_404(Subject, id=subject_id)
+    syllabi = Syllabus.objects.filter(subject=subject).order_by('title')
+    context = {
+        'subject': subject,
+        'syllabi': syllabi,
+    }
+    return render(request, 'webportal/syllabus_list.html', context)
+

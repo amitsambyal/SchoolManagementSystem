@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Syllabus for {{ school_class.class_name }}</title>
+    <link rel="stylesheet" href="{% static 'webportal/css/style.css' %}">
+</head>
+<body>
+    <h1>Syllabus for {{ school_class.class_name }}</h1>
+    {% if syllabi %}
+        <ul>
+        {% for syllabus in syllabi %}
+            <li>
+                <h3>{{ syllabus.subject.name }} - {{ syllabus.title }}</h3>
+                <div>{{ syllabus.content|safe }}</div>
+                <hr>
+            </li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        <p>No syllabus available for this class.</p>
+    {% endif %}
+</body>
+</html>

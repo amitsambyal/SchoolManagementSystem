@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'ckeditor'
 ]
 
 MIDDLEWARE = [
@@ -74,23 +75,12 @@ WSGI_APPLICATION = 'sms.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-'''DATABASES = {
+DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
     }
-}'''
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'angelschooldayalachak',
-        'USER': 'angelschool',
-        'PASSWORD': 'Qdqm395#0',
-        'HOST': 'localhost',
-        'PORT': '3306',
-    }
 }
-
 
 
 # Password validation
@@ -144,3 +134,11 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'angelschooldayalachak@gmail.com'
 EMAIL_HOST_PASSWORD = 'Sam@1234'
+
+CKEDITOR_CONFIGS = {
+    'default': {
+        'toolbar': 'full',
+        'height': 300,
+        'width': 800,
+    },
+}
