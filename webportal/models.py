@@ -168,6 +168,7 @@ class Appointment(models.Model):
      
     
 # Testimonial Model
+
 class Testimonial(models.Model):
     client_name = models.CharField(max_length=255)
     profession = models.CharField(max_length=255)

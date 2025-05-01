@@ -1,0 +1,28 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Syllabus</title>
+    <link rel="stylesheet" href="{% static 'webportal/css/syllabus.css' %}">
+</head>
+<body>
+    <div class="container">
+        <h1>Class and Subject List</h1>
+        <div class="class-list">
+            {% for school_class in schoolclass %}
+            <div class="class-item">
+                <h2>{{ school_class.name }}</h2>
+                <ul class="subject-list">
+                    {% for subject in school_class.subjects.all %}
+                    <li class="subject-item">{{ subject.name }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+</html>

@@ -1,4 +1,5 @@
 from django.shortcuts import render, get_object_or_404
+from django.http import JsonResponse
 from .models import favicon, logo, CarouselItem, SchoolClass, SchoolFacility, AboutUs, CallToAction, \
       Teacher, Appointment, TeamMember, Testimonial, FooterNewsletter, FooterSocialLink, SchoolClass, Syllabus
 from django.contrib.auth import login
@@ -52,6 +53,10 @@ def about(request):
 def contact(request):
     return render(request, 'webportal/contact.html')
 
+def syllabus(request):
+    schoolclass = SchoolClass.objects.prefetch_related('subjects').all()
+    return render(request, 'webportal/syllabus.html', {'schoolclass': schoolclass})
+
 # Custom Login View
 class CustomLoginView(LoginView):
     def form_valid(self, form):
@@ -63,21 +68,11 @@ class CustomLoginView(LoginView):
             return redirect('password_change')  # Ensure this URL name matches your password change view
         return super().form_valid(form)
 
-def syllabus_list(request, class_id):
-    school_class = get_object_or_404(SchoolClass, id=class_id)
-    syllabi = Syllabus.objects.filter(subject__school_class=school_class).order_by('subject__name', 'title')
-    context = {
-        'school_class': school_class,
-        'syllabi': syllabi,
-    }
-    return render(request, 'webportal/syllabus_list.html', context)
 
-def syllabus_by_subject(request, subject_id):
-    subject = get_object_or_404(Subject, id=subject_id)
-    syllabi = Syllabus.objects.filter(subject=subject).order_by('title')
-    context = {
-        'subject': subject,
-        'syllabi': syllabi,
-    }
-    return render(request, 'webportal/syllabus_list.html', context)
+
+def get_subjects_by_class(request, class_id):
+    school_class = get_object_or_404(SchoolClass, id=class_id)
+    subjects = school_class.subjects.all()
+    subject_data = [{'id': subject.id, 'name': subject.name} for subject in subjects]
+    return JsonResponse({'subjects': subject_data})
 
