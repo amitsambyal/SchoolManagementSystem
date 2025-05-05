@@ -5,7 +5,7 @@ from datetime import date
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.core.mail import send_mail
-from tinymce.models import HTMLField
+from django_ckeditor_5.fields import CKEditor5Field
 import random
 import string
 
@@ -285,7 +285,7 @@ class Syllabus(models.Model):
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='syllabi')
     teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name='syllabi')
     title = models.CharField(max_length=255, help_text="Title of the syllabus section")
-    content = HTMLField(help_text="Detailed content of the syllabus")
+    content = CKEditor5Field(help_text="Detailed content of the syllabus",config_name='extends')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
