@@ -29,6 +29,13 @@ def index(request):
     for school_class in schoolclass:
         subjects_by_class[school_class.id] = school_class.subjects.all()
 
+    # Process team members profile pictures
+    for member in teamMember:
+        if not member.profile_picture:
+            member.profile_picture_url = None
+        else:
+            member.profile_picture_url = member.profile_picture.url
+
     content = {
         'carouselItem': carouselItem,
         'schoolfacility': schoolfacility,

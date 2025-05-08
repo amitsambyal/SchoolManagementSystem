@@ -8,6 +8,7 @@ from django.core.mail import send_mail
 from django_ckeditor_5.fields import CKEditor5Field
 import random
 import string
+from django.utils.timezone import now
 
 # Create your models here.
 class favicon(models.Model):
@@ -64,11 +65,9 @@ class AboutUs(models.Model):
     ceo_name = models.CharField(max_length=100, help_text="CEO's Name")
     ceo_title = models.CharField(max_length=100, help_text="CEO's title (e.g., CEO & Founder)")
     ceo_image = models.ImageField(upload_to='about_us/ceo/', help_text="Image of the CEO", blank=True, null=True)
-    
     image_1 = models.ImageField(upload_to='about_us/images/', help_text="First image for About section")
     image_2 = models.ImageField(upload_to='about_us/images/', help_text="Second image for About section", blank=True, null=True)
     image_3 = models.ImageField(upload_to='about_us/images/', help_text="Third image for About section", blank=True, null=True)
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -81,7 +80,6 @@ class CallToAction(models.Model):
     cta_image = models.ImageField(upload_to='cta_images/', help_text="Image for the Call to Action section")
     cta_button_text = models.CharField(max_length=100, help_text="Text for the CTA button")
     cta_button_link = models.URLField(max_length=200, help_text="Link for the CTA button")
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -146,7 +144,6 @@ class TeamMember(models.Model):
 class SchoolClass(models.Model):
     class_name = models.CharField(max_length=255, help_text="The name of the class (e.g., 'Class1,Class2')")
     class_image = models.ImageField(upload_to='class_images/', help_text="Image representing the class")
-   # teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name="classes", help_text="The teacher for the class")
     age_group = models.CharField(max_length=50, help_text="Age group for the class (e.g., '3-5 Years')")
     time = models.CharField(max_length=50, help_text="Time when the class is held (e.g., '9-10 AM')")
     capacity = models.IntegerField(help_text="Maximum capacity of students in the class")
@@ -272,21 +269,33 @@ class Timetable(models.Model):
         return f"{self.school_class.class_name} - {self.day} {self.start_time.strftime('%H:%M')} - {self.subject.name}"
 
 class Homework(models.Model):
-    school_class = models.ForeignKey('SchoolClass', on_delete=models.CASCADE, related_name='homeworks')
-    subject = models.ForeignKey('Subject', on_delete=models.CASCADE, related_name='homeworks', null=True, blank=True)
-    assigned_date = models.DateField()
-    due_date = models.DateField()
-    description = models.TextField()
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='homeworks')
+    teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name='homeworks')
+    title = models.CharField(max_length=255, help_text="Title of the homework", default="Untitled Homework")
+    description = CKEditor5Field(help_text="Detailed description of the homework", config_name='extends', default="No description provided.")
+    assigned_date = models.DateField(help_text="Date when the homework was assigned", default=date.today)
+    due_date = models.DateField(help_text="Date when the homework is due", default=date.today)
+    created_at = models.DateTimeField(auto_now=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name_plural = "Homeworks"
+        unique_together = ('subject', 'title')
 
     def __str__(self):
-        return f"Homework for {self.school_class.class_name} due {self.due_date}"
+        return f"{self.subject.name} Homework: {self.title}"
+
+    def clean(self):
+        # Ensure the teacher is an expert in the subject
+        if not self.teacher.subject_expert.filter(id=self.subject.id).exists():
+            raise ValidationError("You can only add homework for subjects you are an expert in.")
 
 class Syllabus(models.Model):
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='syllabi')
     teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name='syllabi')
     title = models.CharField(max_length=255, help_text="Title of the syllabus section")
-    content = CKEditor5Field(help_text="Detailed content of the syllabus",config_name='extends')
-    created_at = models.DateTimeField(auto_now_add=True)
+    content = CKEditor5Field(help_text="Detailed content of the syllabus", config_name='extends')
+    created_at = models.DateTimeField(auto_now=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

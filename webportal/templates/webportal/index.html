@@ -235,12 +235,12 @@
                                             <small>{{item.age_group}}</small>
                                         </div>
                                     </div>
-                                    <div class="col-4">
+                                  <!--  <div class="col-4">
                                         <div class="border-top border-3 border-success pt-2">
                                             <h6 class="text-success mb-1">Time:</h6>
                                             <small>{{item.time}}</small>
                                         </div>
-                                    </div>
+                                    </div> -->
                                     <div class="col-4">
                                         <div class="border-top border-3 border-warning pt-2">
                                             <h6 class="text-warning mb-1">Capacity:</h6>
@@ -325,21 +325,16 @@
                     <p>Our team of experienced educators are committed to delivering high-quality education to our students. They bring a wealth of knowledge, passion, and expertise to the classroom. Meet some of our most beloved teachers who inspire and shape the minds of future leaders.</p>
                 </div>
                 <div class="row g-4">
-                    {% for item in teammember %}
-                    <div class="col-lg-4 col-md-6 wow fadeInUp" data-wow-delay="0.1s">
-                        <div class="team-item position-relative">
-                            <img class="img-fluid rounded-circle w-75" src="{{item.profile_picture.url}}" alt="" style="object-fit: cover; width: 400px; height: 400px;">
-                            <div class="team-text">
-                                <h3>{{item.teacher.name}}</h3>
-                                <p>{{item.designation}}</p>
-                                <div class="d-flex align-items-center">
-                                    <a class="btn btn-square btn-primary mx-1" href="{{item.facebook_url.url}}"><i class="fab fa-facebook-f"></i></a>
-                                    <a class="btn btn-square btn-primary  mx-1" href="{{item.twitter_url}}"><i class="fab fa-twitter"></i></a>
-                                    <a class="btn btn-square btn-primary  mx-1" href="{{item.instagram_url}}"><i class="fab fa-instagram"></i></a>
-                                </div>
-                            </div>
+                    {% for member in teammember %}
+                        <div class="team-member">
+                            <h3>{{ member.teacher.name }}</h3>
+                            {% if member.profile_picture %}
+                                <img src="{{ member.profile_picture.url }}" alt="{{ member.teacher.name }}">
+                            {% else %}
+                                <img src="{% static 'webportal/img/default-profile.png' %}" alt="Default Profile Picture">
+                            {% endif %}
+                            <p>{{ member.designation }}</p>
                         </div>
-                    </div>
                     {% endfor %}
                 </div>
             </div>
