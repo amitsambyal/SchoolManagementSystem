@@ -1,5 +1,4 @@
 {% load static %}
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,20 +7,38 @@
     <title>Syllabus</title>
     <link rel="stylesheet" href="{% static 'webportal/css/syllabus.css' %}">
     <script>
-        // JavaScript to handle dynamic display of subjects and syllabus
-        function showSubjects(classId) {
+        function toggleSubjects(classId) {
             // Hide all subject lists
-            document.querySelectorAll('.subject-list').forEach(list => list.style.display = 'none');
-            // Show the selected class's subject list
-            document.getElementById(`subjects-${classId}`).style.display = 'block';
-            // Clear syllabus display
-            document.getElementById('syllabus-display').innerHTML = '';
+            const allSubjectLists = document.querySelectorAll('.subject-list');
+            allSubjectLists.forEach(list => {
+                if (list.id !== `subjects-${classId}`) {
+                    list.style.display = 'none';
+                }
+            });
+
+            // Toggle the clicked class's subject list
+            const subjectList = document.getElementById(`subjects-${classId}`);
+            if (subjectList.style.display === 'none' || subjectList.style.display === '') {
+                subjectList.style.display = 'block';
+            } else {
+                subjectList.style.display = 'none';
+            }
         }
 
-        function showSyllabus(subjectId, syllabus) {
-            // Display the syllabus for the selected subject
-            const syllabusDisplay = document.getElementById('syllabus-display');
-            syllabusDisplay.innerHTML = `<h3>Syllabus for ${subjectId}</h3><p>${syllabus}</p>`;
+        function toggleSyllabus(subjectId) {
+            const syllabusElement = document.getElementById(`syllabus-${subjectId}`);
+            const isCurrentlyVisible = syllabusElement.style.display === 'block';
+        
+            // Hide all syllabi
+            const allSyllabi = document.querySelectorAll('.syllabus-content');
+            allSyllabi.forEach(syllabus => {
+                syllabus.style.display = 'none';
+            });
+        
+            // If the clicked syllabus wasn't visible before, show it now
+            if (!isCurrentlyVisible) {
+                syllabusElement.style.display = 'block';
+            }
         }
     </script>
 </head>
@@ -30,26 +47,27 @@
         <h1>Syllabus</h1>
         <div class="class-list">
             {% for school_class in schoolclass %}
-            <div class="class-item" onclick="showSubjects('{{ school_class.id }}')">
-                <h2>{{ school_class.class_name }}</h2>
+            <div class="class-item">
+                <h2 onclick="toggleSubjects('{{ school_class.id }}')">{{ school_class.class_name }}</h2>
+                <ul id="subjects-{{ school_class.id }}" class="subject-list" style="display: none;">
+                    {% for subject in school_class.subjects.all %}
+                    <li class="subject-item">
+                        <span onclick="toggleSyllabus('{{ subject.id }}')">{{ subject.name }}</span>
+                        {% if subject.syllabi.exists %}
+                        <div id="syllabus-{{ subject.id }}" class="syllabus-content" style="display: none;">
+                            <h3>{{ subject.syllabi.first.title }}</h3>
+                            <div>{{ subject.syllabi.first.content|safe }}</div>
+                        </div>
+                        {% else %}
+                        <div id="syllabus-{{ subject.id }}" class="syllabus-content" style="display: none;">
+                            <p>No syllabus available</p>
+                        </div>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
             </div>
-            <ul class="subject-list" id="subjects-{{ school_class.id }}" style="display: none;">
-                {% for subject in school_class.subjects.all %}
-                <li class="subject-item">
-                    {% if subject.syllabi.exists %}
-                    <span onclick="showSyllabus('{{ subject.syllabi.first.title|escapejs }}', '{{ subject.syllabi.first.content|escapejs }}')">
-                        {{ subject.name }}
-                    </span>
-                    {% else %}
-                    <span>No syllabus available</span>
-                    {% endif %}
-                </li>
-                {% endfor %}
-            </ul>
             {% endfor %}
-        </div>
-        <div id="syllabus-display" class="syllabus-display">
-            <!-- Syllabus will be displayed here -->
         </div>
     </div>
 </body>
