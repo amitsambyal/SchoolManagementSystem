@@ -199,9 +199,10 @@ class FooterNewsletter(models.Model):
 # New models for attendance, timetable, and homework management
 
 class Student(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='student_profile', null=True, blank=True)
     roll_no = models.CharField(max_length=20, null=True, blank=True)
     name = models.CharField(max_length=255)
-    phone_no = models.CharField(max_length=20, null=True, blank=True)  # New phone number field
+    phone_no = models.CharField(max_length=20, unique=True)  # New phone number field
     date_of_birth = models.DateField(null=True, blank=True)
     gender_choices = [
         ('male', 'Male'),
@@ -212,7 +213,7 @@ class Student(models.Model):
     address = models.TextField(null=True, blank=True)
     parent_guardian_name = models.CharField(max_length=255, null=True, blank=True)
     parent_guardian_contact = models.CharField(max_length=20, null=True, blank=True)
-    email = models.EmailField(null=True, blank=True)
+    email = models.EmailField(unique=True,default='')  # New email field
     image = models.ImageField(upload_to='student_images/', null=True, blank=True)
     school_class = models.ForeignKey('SchoolClass', on_delete=models.CASCADE, related_name='students')
 
@@ -221,14 +222,36 @@ class Student(models.Model):
 
     def __str__(self):
         return self.name
+    
+    def save(self, *args, **kwargs):
+        creating = self._state.adding
+        super().save(*args, **kwargs)
+        if creating:
+            self.create_user_account()
 
+    def create_user_account(self):
+        if not self.user:
+            username = self.email.split('@')[0]
+            password = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
+            user = User.objects.create_user(username=username, email=self.email, password=password)
+            self.user = user
+            self.save()
+            # Here you might want to send an email to the teacher with their login credentials
+            print(f"User account created for {self.name}. Username: {username}, Password: {password}")
+            
     @property
     def age(self):
         if self.date_of_birth:
             today = date.today()
             age = today.year - self.date_of_birth.year - ((today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day))
             return age
-        return None
+        return None        
+
+@receiver(post_save, sender=Student)
+def update_user_account(sender, instance, created, **kwargs):
+    if not created and instance.user:
+        instance.user.email = instance.email
+        instance.user.save()
 
 class Attendance(models.Model):
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='attendances')

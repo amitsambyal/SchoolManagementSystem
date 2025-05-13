@@ -64,6 +64,11 @@ class StudentAdmin(admin.ModelAdmin):
     def age_display(self, obj):
         return obj.age
     age_display.short_description = 'Age'
+    
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if not change:  # This is a new student
+            obj.create_user_account()
 
 @admin.register(Attendance)
 class AttendanceAdmin(admin.ModelAdmin):
@@ -172,7 +177,7 @@ class SyllabusAdmin(admin.ModelAdmin):
         if db_field.name == "subject" and not request.user.is_superuser:
             kwargs["queryset"] = Subject.objects.filter(expert_teachers=request.user.teacher_profile)
         if db_field.name == "teacher" and not request.user.is_superuser:
-            kwargs["queryset"] = Teacher.objects.filter(user=request.user)
+            kwargs["queryset"] = Teacher.objects.filter(user=request.user)        
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def save_model(self, request, obj, form, change):
