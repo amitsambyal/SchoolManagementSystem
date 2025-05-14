@@ -216,7 +216,8 @@ class Student(models.Model):
     email = models.EmailField(unique=True,default='')  # New email field
     image = models.ImageField(upload_to='student_images/', null=True, blank=True)
     school_class = models.ForeignKey('SchoolClass', on_delete=models.CASCADE, related_name='students')
-
+    pen_number = models.CharField(max_length=12, unique=True,default='')
+    
     class Meta:
         unique_together = ('roll_no', 'school_class')
 
@@ -231,7 +232,7 @@ class Student(models.Model):
 
     def create_user_account(self):
         if not self.user:
-            username = self.email.split('@')[0]
+            username = self.pen_number
             password = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
             user = User.objects.create_user(username=username, email=self.email, password=password)
             self.user = user

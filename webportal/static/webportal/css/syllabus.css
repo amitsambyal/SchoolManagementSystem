@@ -31,7 +31,7 @@ h1 {
     color: #fff;
     border-radius: 5px;
     cursor: pointer;
-    text-align: center;
+    text-align: left;
 }
 
 .class-item:hover {

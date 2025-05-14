@@ -38,7 +38,7 @@ class StudentAdminForm(forms.ModelForm):
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
     form = StudentAdminForm
-    list_display = ('name', 'roll_no', 'phone_no', 'age_display', 'school_class', 'image_tag')
+    list_display = ('name', 'roll_no', 'phone_no', 'age_display', 'school_class', 'pen_number')
     readonly_fields = ('image_tag',)
     list_filter = ('school_class',)
     search_fields = ('name', 'roll_no')
@@ -51,7 +51,7 @@ class StudentAdmin(admin.ModelAdmin):
             'fields': ('address', 'parent_guardian_name', 'parent_guardian_contact', 'email')
         }),
         ('Academic Information', {
-            'fields': ('school_class',)
+            'fields': ('school_class','pen_number')
         }),
     )
 
