@@ -5,7 +5,9 @@ from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django import forms
 from django.core.exceptions import PermissionDenied
-from .models import favicon, logo, CarouselItem, SchoolClass, SchoolFacility, AboutUs, CallToAction, Teacher, Appointment, TeamMember, Testimonial, FooterNewsletter, FooterSocialLink, Student, Attendance, Timetable, Homework, Subject,Syllabus
+from django.db.models import Q
+from django.contrib.admin.filters import RelatedFieldListFilter
+from .models import favicon, logo, CarouselItem, SchoolClass, SchoolFacility, AboutUs, CallToAction, Teacher, Appointment, TeamMember, Testimonial, FooterNewsletter, FooterSocialLink, Student, Attendance, Timetable, Homework, Subject, Syllabus
 
 admin.site.site_header = "School Management System"
 admin.site.site_title = "School Admin Panel"
@@ -82,57 +84,93 @@ class TimetableAdmin(admin.ModelAdmin):
     list_filter = ('day', 'school_class')
     search_fields = ('school_class__class_name', 'subject__name')
 
+class CustomSubjectListFilter(RelatedFieldListFilter):
+    def field_choices(self, field, request, model_admin):
+        if hasattr(request.user, 'teacher_profile'):
+            teacher = request.user.teacher_profile
+            return [(s.pk, str(s)) for s in Subject.objects.filter(expert_teachers=teacher)]
+        elif hasattr(request.user, 'student_profile'):
+            student = request.user.student_profile
+            return [(s.pk, str(s)) for s in Subject.objects.filter(school_class=student.school_class)]
+        else:
+            return super().field_choices(field, request, model_admin)
+
 class HomeworkAdmin(admin.ModelAdmin):
     list_display = ('title', 'subject', 'teacher', 'assigned_date', 'due_date', 'created_at', 'updated_at')
-    list_filter = ('subject', 'teacher', 'assigned_date', 'due_date')
+    list_filter = (('subject', CustomSubjectListFilter), 'teacher', 'assigned_date', 'due_date')
     search_fields = ('title', 'description')
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         if request.user.is_superuser:
             return qs
-        return qs.filter(teacher=request.user.teacher_profile)
+        if hasattr(request.user, 'teacher_profile'):
+            return qs.filter(teacher=request.user.teacher_profile)
+        if hasattr(request.user, 'student_profile'):
+            student = request.user.student_profile
+            return qs.filter(subject__school_class=student.school_class)
+        return qs.none()
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if db_field.name == "subject" and not request.user.is_superuser:
-            kwargs["queryset"] = Subject.objects.filter(expert_teachers=request.user.teacher_profile)
-        if db_field.name == "teacher" and not request.user.is_superuser:
-            kwargs["queryset"] = Teacher.objects.filter(user=request.user)
+        from datetime import date
+        # Filter subjects for teachers and students
+        if db_field.name == "subject":
+            if hasattr(request.user, 'teacher_profile'):
+                teacher = request.user.teacher_profile
+                today = date.today()
+                # Exclude subjects for which homework already exists today
+                used_subjects = Homework.objects.filter(
+                    teacher=teacher, assigned_date=today
+                ).values_list('subject_id', flat=True)
+                kwargs["queryset"] = Subject.objects.filter(expert_teachers=teacher).exclude(id__in=used_subjects)
+            elif hasattr(request.user, 'student_profile'):
+                student = request.user.student_profile
+                kwargs["queryset"] = Subject.objects.filter(school_class=student.school_class)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def save_model(self, request, obj, form, change):
-        if not request.user.is_superuser:
-            # Only allow adding if the teacher is linked to the subject
-            if not obj.teacher.subject_expert.filter(id=obj.subject.id).exists():
-                raise PermissionDenied("You can only add homework for subjects you are an expert in.")
+        from datetime import date
+        if not request.user.is_superuser and hasattr(request.user, 'teacher_profile'):
             obj.teacher = request.user.teacher_profile
+            # Enforce only one homework per subject per day
+            if not change:
+                exists = Homework.objects.filter(
+                    teacher=obj.teacher,
+                    subject=obj.subject,
+                    assigned_date=obj.assigned_date
+                ).exists()
+                if exists:
+                    raise PermissionDenied("You have already added homework for this subject today.")
         super().save_model(request, obj, form, change)
 
     def has_add_permission(self, request):
-        # Only allow adding if the user is a teacher
         if request.user.is_superuser:
             return True
-        try:
+        if hasattr(request.user, 'teacher_profile'):
+            from datetime import date
             teacher = request.user.teacher_profile
-            return True
-        except Teacher.DoesNotExist:
-            return False
+            today = date.today()
+            # Only allow add if there is at least one subject without homework today
+            subjects_with_homework = Homework.objects.filter(
+                teacher=teacher, assigned_date=today
+            ).values_list('subject_id', flat=True)
+            available_subjects = Subject.objects.filter(expert_teachers=teacher).exclude(id__in=subjects_with_homework)
+            return available_subjects.exists()
+        return False
 
     def has_change_permission(self, request, obj=None):
-        if request.user.is_superuser:
-            return True
-        if obj is None:
-            return True
-        # Only allow change if the logged-in teacher is the homework teacher
-        return obj.teacher == request.user.teacher_profile
+        if request.user.is_superuser or hasattr(request.user, 'teacher_profile'):
+            if obj is None or request.user.is_superuser:
+                return True
+            return obj.teacher == request.user.teacher_profile
+        return False
 
     def has_delete_permission(self, request, obj=None):
-        if request.user.is_superuser:
-            return True
-        if obj is None:
-            return True
-        # Only allow delete if the logged-in teacher is the homework teacher
-        return obj.teacher == request.user.teacher_profile
+        if request.user.is_superuser or hasattr(request.user, 'teacher_profile'):
+            if obj is None or request.user.is_superuser:
+                return True
+            return obj.teacher == request.user.teacher_profile
+        return False
 
 admin.site.register(Homework, HomeworkAdmin)
 
@@ -163,56 +201,86 @@ class TeacherAdmin(admin.ModelAdmin):
 
 class SyllabusAdmin(admin.ModelAdmin):
     list_display = ('title', 'subject', 'teacher', 'created_at', 'updated_at')
-    list_filter = ('subject', 'teacher')
+    list_filter = (('subject', CustomSubjectListFilter), 'teacher')
     search_fields = ('title', 'content')
-    unique_together = {('subject', 'title')}
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         if request.user.is_superuser:
             return qs
-        return qs.filter(teacher=request.user.teacher_profile)
+        if hasattr(request.user, 'teacher_profile'):
+            teacher = request.user.teacher_profile
+            return qs.filter(teacher=teacher)
+        return qs.none()
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "subject" and not request.user.is_superuser:
-            kwargs["queryset"] = Subject.objects.filter(expert_teachers=request.user.teacher_profile)
+            if hasattr(request.user, 'teacher_profile'):
+                teacher = request.user.teacher_profile
+                # Only allow subjects for which the teacher hasn't already added a syllabus
+                used_subjects = Syllabus.objects.filter(teacher=teacher).values_list('subject_id', flat=True)
+                kwargs["queryset"] = Subject.objects.filter(expert_teachers=teacher).exclude(id__in=used_subjects)
+                # If editing, allow the current subject as well
+                if request.resolver_match and request.resolver_match.kwargs.get('object_id'):
+                    obj_id = request.resolver_match.kwargs['object_id']
+                    try:
+                        current_obj = Syllabus.objects.get(pk=obj_id)
+                        kwargs["queryset"] = Subject.objects.filter(
+                            Q(expert_teachers=teacher) & (Q(id__in=[current_obj.subject_id]) | ~Q(id__in=used_subjects))
+                        )
+                    except Syllabus.DoesNotExist:
+                        pass
+            else:
+                kwargs["queryset"] = Subject.objects.none()
         if db_field.name == "teacher" and not request.user.is_superuser:
-            kwargs["queryset"] = Teacher.objects.filter(user=request.user)        
+            kwargs["queryset"] = Teacher.objects.filter(user=request.user)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def get_list_filter(self, request):
+        filters = list(super().get_list_filter(request))
+        class SubjectListFilter(admin.RelatedFieldListFilter):
+            def field_choices(self, field, request, model_admin):
+                if hasattr(request.user, 'teacher_profile'):
+                    teacher = request.user.teacher_profile
+                    return [(s.pk, str(s)) for s in Subject.objects.filter(expert_teachers=teacher)]
+                else:
+                    return super().field_choices(field, request, model_admin)
+        new_filters = []
+        for f in filters:
+            if f == 'subject':
+                new_filters.append(('subject', SubjectListFilter))
+            else:
+                new_filters.append(f)
+        return new_filters
 
     def save_model(self, request, obj, form, change):
         if not request.user.is_superuser:
-            # Only allow adding if the teacher is linked to the subject
             if not obj.teacher.subject_expert.filter(id=obj.subject.id).exists():
                 raise PermissionDenied("You can only add syllabus for subjects you are an expert in.")
             obj.teacher = request.user.teacher_profile
         super().save_model(request, obj, form, change)
 
     def has_add_permission(self, request):
-        # Only allow adding if the user is a teacher
         if request.user.is_superuser:
             return True
-        try:
+        if hasattr(request.user, 'teacher_profile'):
             teacher = request.user.teacher_profile
-            return True
-        except Teacher.DoesNotExist:
-            return False
+            # Only allow add if there is at least one subject without a syllabus
+            subjects_with_syllabus = Syllabus.objects.filter(teacher=teacher).values_list('subject_id', flat=True)
+            available_subjects = Subject.objects.filter(expert_teachers=teacher).exclude(id__in=subjects_with_syllabus)
+            return available_subjects.exists()
+        return False
 
     def has_change_permission(self, request, obj=None):
         if request.user.is_superuser:
             return True
         if obj is None:
             return True
-        # Only allow change if the logged-in teacher is the syllabus teacher
         return obj.teacher == request.user.teacher_profile
 
     def has_delete_permission(self, request, obj=None):
-        if request.user.is_superuser:
-            return True
-        if obj is None:
-            return True
-        # Only allow delete if the logged-in teacher is the syllabus teacher
-        return obj.teacher == request.user.teacher_profile
+        # No one can delete
+        return False
 
 admin.site.register(Syllabus, SyllabusAdmin)
 admin.site.register(Teacher, TeacherAdmin)
