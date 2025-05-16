@@ -211,75 +211,43 @@ class SyllabusAdmin(admin.ModelAdmin):
         if hasattr(request.user, 'teacher_profile'):
             teacher = request.user.teacher_profile
             return qs.filter(teacher=teacher)
+        if hasattr(request.user, 'student_profile'):
+            student = request.user.student_profile
+            return qs.filter(subject__school_class=student.school_class)
         return qs.none()
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if db_field.name == "subject" and not request.user.is_superuser:
+        if db_field.name == "subject":
             if hasattr(request.user, 'teacher_profile'):
                 teacher = request.user.teacher_profile
-                # Only allow subjects for which the teacher hasn't already added a syllabus
-                used_subjects = Syllabus.objects.filter(teacher=teacher).values_list('subject_id', flat=True)
-                kwargs["queryset"] = Subject.objects.filter(expert_teachers=teacher).exclude(id__in=used_subjects)
-                # If editing, allow the current subject as well
-                if request.resolver_match and request.resolver_match.kwargs.get('object_id'):
-                    obj_id = request.resolver_match.kwargs['object_id']
-                    try:
-                        current_obj = Syllabus.objects.get(pk=obj_id)
-                        kwargs["queryset"] = Subject.objects.filter(
-                            Q(expert_teachers=teacher) & (Q(id__in=[current_obj.subject_id]) | ~Q(id__in=used_subjects))
-                        )
-                    except Syllabus.DoesNotExist:
-                        pass
-            else:
-                kwargs["queryset"] = Subject.objects.none()
-        if db_field.name == "teacher" and not request.user.is_superuser:
-            kwargs["queryset"] = Teacher.objects.filter(user=request.user)
+                kwargs["queryset"] = Subject.objects.filter(expert_teachers=teacher)
+            elif hasattr(request.user, 'student_profile'):
+                student = request.user.student_profile
+                kwargs["queryset"] = Subject.objects.filter(school_class=student.school_class)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
-    def get_list_filter(self, request):
-        filters = list(super().get_list_filter(request))
-        class SubjectListFilter(admin.RelatedFieldListFilter):
-            def field_choices(self, field, request, model_admin):
-                if hasattr(request.user, 'teacher_profile'):
-                    teacher = request.user.teacher_profile
-                    return [(s.pk, str(s)) for s in Subject.objects.filter(expert_teachers=teacher)]
-                else:
-                    return super().field_choices(field, request, model_admin)
-        new_filters = []
-        for f in filters:
-            if f == 'subject':
-                new_filters.append(('subject', SubjectListFilter))
-            else:
-                new_filters.append(f)
-        return new_filters
-
-    def save_model(self, request, obj, form, change):
-        if not request.user.is_superuser:
-            if not obj.teacher.subject_expert.filter(id=obj.subject.id).exists():
-                raise PermissionDenied("You can only add syllabus for subjects you are an expert in.")
-            obj.teacher = request.user.teacher_profile
-        super().save_model(request, obj, form, change)
-
     def has_add_permission(self, request):
+        # Only teachers and superusers can add
+        return request.user.is_superuser or hasattr(request.user, 'teacher_profile')
+
+    def has_change_permission(self, request, obj=None):
+        # Only teachers (for their own) and superusers can change
         if request.user.is_superuser:
             return True
         if hasattr(request.user, 'teacher_profile'):
-            teacher = request.user.teacher_profile
-            # Only allow add if there is at least one subject without a syllabus
-            subjects_with_syllabus = Syllabus.objects.filter(teacher=teacher).values_list('subject_id', flat=True)
-            available_subjects = Subject.objects.filter(expert_teachers=teacher).exclude(id__in=subjects_with_syllabus)
-            return available_subjects.exists()
+            if obj is None:
+                return True
+            return obj.teacher == request.user.teacher_profile
         return False
 
-    def has_change_permission(self, request, obj=None):
+    def has_delete_permission(self, request, obj=None):
+        # Only teachers (for their own) and superusers can delete
         if request.user.is_superuser:
             return True
-        if obj is None:
-            return True
-        return obj.teacher == request.user.teacher_profile
-
-    def has_delete_permission(self, request, obj=None):
-        # No one can delete
+        if hasattr(request.user, 'teacher_profile'):
+            if obj is None:
+                return True
+            return obj.teacher == request.user.teacher_profile
         return False
 
 admin.site.register(Syllabus, SyllabusAdmin)
