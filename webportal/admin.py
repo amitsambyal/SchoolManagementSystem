@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from django.utils.html import format_html
+from django.utils.html import format_html, strip_tags
 from django.utils.safestring import mark_safe
 from django import forms
 from django.core.exceptions import PermissionDenied
@@ -41,7 +41,7 @@ class StudentAdminForm(forms.ModelForm):
 class StudentAdmin(admin.ModelAdmin):
     form = StudentAdminForm
     list_display = ('name', 'roll_no', 'phone_no', 'age_display', 'school_class', 'pen_number')
-    readonly_fields = ('image_tag',)
+    readonly_fields = ('image_tag', 'syllabus_homework_overview')
     list_filter = ('school_class',)
     search_fields = ('name', 'roll_no')
 
@@ -55,6 +55,9 @@ class StudentAdmin(admin.ModelAdmin):
         ('Academic Information', {
             'fields': ('school_class','pen_number')
         }),
+        ('Syllabus & Homework', {
+            'fields': ('syllabus_homework_overview',)
+        }),
     )
 
     def image_tag(self, obj):
@@ -67,6 +70,43 @@ class StudentAdmin(admin.ModelAdmin):
         return obj.age
     age_display.short_description = 'Age'
     
+    def syllabus_homework_overview(self, obj):
+        html = '<div style="padding:10px;">'
+        subjects = obj.school_class.subjects.all()
+        for subject in subjects:
+            html += f'<div style="margin-bottom:20px;padding:10px;border:1px solid #eee;border-radius:6px;background:#f9f9fc;">'
+            html += f'<h4 style="color:#007bff;">{subject.name}</h4>'
+            # Syllabus
+            syllabus = subject.syllabi.all()
+            html += '<div><strong>Syllabus:</strong>'
+            if syllabus:
+                for s in syllabus:
+                    clean_content = strip_tags(s.content)
+                    html += f'<div style="margin:5px 0 10px 0;padding:8px;background:#f1f3f6;border-radius:4px;">'
+                    html += f'<b>{s.title}</b><br>{clean_content}'
+                    html += f'<br><em>Teacher: {s.teacher.name}</em>'
+                    html += '</div>'
+            else:
+                html += '<div style="color:#888;">No syllabus available.</div>'
+            html += '</div>'
+            # Homework
+            homeworks = subject.homeworks.filter(subject__school_class=obj.school_class).order_by('-assigned_date')
+            html += '<div style="margin-top:10px;"><strong>Homework:</strong>'
+            if homeworks:
+                for hw in homeworks:
+                    clean_desc = strip_tags(hw.description)
+                    html += f'<div style="margin:5px 0 10px 0;padding:8px;background:#f8f9fa;border-radius:4px;">'
+                    html += f'<b>{hw.title}</b><br>{clean_desc}'
+                    html += f'<br><span style="font-size:0.95em;color:#888;">Assigned: {hw.assigned_date} | Due: {hw.due_date}</span>'
+                    html += '</div>'
+            else:
+                html += '<div style="color:#888;">No homework assigned.</div>'
+            html += '</div>'
+            html += '</div>'
+        html += '</div>'
+        return mark_safe(html)
+    syllabus_homework_overview.short_description = "Syllabus & Homework Overview"
+
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
         if not change:  # This is a new student
@@ -100,6 +140,22 @@ class HomeworkAdmin(admin.ModelAdmin):
     list_filter = (('subject', CustomSubjectListFilter), 'teacher', 'assigned_date', 'due_date')
     search_fields = ('title', 'description')
 
+    def get_readonly_fields(self, request, obj=None):
+        if hasattr(request.user, 'student_profile'):
+            return ['subject', 'teacher', 'title', 'assigned_date', 'due_date', 'html_description', 'created_at', 'updated_at']
+        # For teachers and superusers, show created_at and updated_at as read-only
+        return ['created_at', 'updated_at'] + list(super().get_readonly_fields(request, obj))
+
+    def html_description(self, obj):
+        return mark_safe(obj.description)
+    html_description.short_description = "Description"
+
+    def get_fields(self, request, obj=None):
+        if hasattr(request.user, 'student_profile'):
+            return ['subject', 'teacher', 'title', 'html_description', 'assigned_date', 'due_date']
+        # Only include editable fields for the form, not id/created_at/updated_at
+        return ['subject', 'teacher', 'title', 'description', 'assigned_date', 'due_date']
+
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         if request.user.is_superuser:
@@ -113,12 +169,10 @@ class HomeworkAdmin(admin.ModelAdmin):
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         from datetime import date
-        # Filter subjects for teachers and students
         if db_field.name == "subject":
             if hasattr(request.user, 'teacher_profile'):
                 teacher = request.user.teacher_profile
                 today = date.today()
-                # Exclude subjects for which homework already exists today
                 used_subjects = Homework.objects.filter(
                     teacher=teacher, assigned_date=today
                 ).values_list('subject_id', flat=True)
@@ -159,10 +213,13 @@ class HomeworkAdmin(admin.ModelAdmin):
         return False
 
     def has_change_permission(self, request, obj=None):
-        if request.user.is_superuser or hasattr(request.user, 'teacher_profile'):
-            if obj is None or request.user.is_superuser:
-                return True
-            return obj.teacher == request.user.teacher_profile
+        # Only teachers (for their own) and superusers can change
+        if request.user.is_superuser:
+            return True
+        if hasattr(request.user, 'teacher_profile'):
+            if obj is None:
+                return True  # Allow access to the change list
+            return obj.teacher == request.user.teacher_profile  # Allow only if the teacher owns the object
         return False
 
     def has_delete_permission(self, request, obj=None):
@@ -204,6 +261,24 @@ class SyllabusAdmin(admin.ModelAdmin):
     list_filter = (('subject', CustomSubjectListFilter), 'teacher')
     search_fields = ('title', 'content')
 
+    def get_readonly_fields(self, request, obj=None):
+        # For students, make all fields readonly and show html_content instead of content
+        if hasattr(request.user, 'student_profile'):
+            return ['subject', 'teacher', 'title', 'html_content', 'created_at', 'updated_at']
+        return super().get_readonly_fields(request, obj)
+
+    def html_content(self, obj):
+        return mark_safe(obj.content)
+    html_content.short_description = "Content"
+
+    def get_fields(self, request, obj=None):
+        # For students, show only the specified fields, replacing 'content' with 'html_content'
+        if hasattr(request.user, 'student_profile'):
+            # Do NOT include created_at or updated_at here!
+            return ['subject', 'teacher', 'title', 'html_content']
+        # Only include editable fields for the form, not id/created_at/updated_at
+        return ['subject', 'teacher', 'title', 'content']
+
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         if request.user.is_superuser:
@@ -236,8 +311,8 @@ class SyllabusAdmin(admin.ModelAdmin):
             return True
         if hasattr(request.user, 'teacher_profile'):
             if obj is None:
-                return True
-            return obj.teacher == request.user.teacher_profile
+                return True  # Allow access to the change list
+            return obj.teacher == request.user.teacher_profile  # Allow only if the teacher owns the object
         return False
 
     def has_delete_permission(self, request, obj=None):
