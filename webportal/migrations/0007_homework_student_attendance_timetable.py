@@ -17,6 +17,7 @@ class Migration(migrations.Migration):
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('assigned_date', models.DateField()),
                 ('due_date', models.DateField()),
+                ('title', models.CharField(max_length=255)),
                 ('description', models.TextField()),
                 ('school_class', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='homeworks', to='webportal.schoolclass')),
             ],
