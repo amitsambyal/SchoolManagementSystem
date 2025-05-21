@@ -1,0 +1,39 @@
+{% extends "admin/base_site.html" %}
+{% load dict_extras %}
+{% block content %}
+<h1>Timetable for {{ school_class.class_name }}</h1>
+<table border="1" cellpadding="8" style="border-collapse:collapse;">
+    <thead>
+        <tr>
+            <th>Day</th>
+            <th>Start Time</th>
+            <th>End Time</th>
+            <th>Subject</th>
+            <th>Teacher</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for day in days %}
+            {% with entries=timetable_dict|dict_get:day %}
+                {% if entries %}
+                    {% for entry in entries %}
+                        <tr>
+                            <td>{{ entry.day }}</td>
+                            <td>{{ entry.start_time }}</td>
+                            <td>{{ entry.end_time }}</td>
+                            <td>{{ entry.subject.name }}</td>
+                            <td>{{ entry.teacher.name }}</td>
+                        </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td>{{ day }}</td>
+                        <td colspan="4">No periods</td>
+                    </tr>
+                {% endif %}
+            {% endwith %}
+        {% endfor %}
+    </tbody>
+</table>
+<a href="../../">Back to Classes</a>
+{% endblock %}

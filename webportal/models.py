@@ -147,6 +147,13 @@ class SchoolClass(models.Model):
     age_group = models.CharField(max_length=50, help_text="Age group for the class (e.g., '3-5 Years')")
     time = models.CharField(max_length=50, help_text="Time when the class is held (e.g., '9-10 AM')")
     capacity = models.IntegerField(help_text="Maximum capacity of students in the class")
+    class_teacher = models.ForeignKey(
+        'Teacher',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='class_teacher_for'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -254,43 +261,6 @@ def update_user_account(sender, instance, created, **kwargs):
         instance.user.email = instance.email
         instance.user.save()
 
-class Attendance(models.Model):
-    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='attendances')
-    date = models.DateField()
-    status_choices = [
-        ('present', 'Present'),
-        ('absent', 'Absent'),
-        ('late', 'Late'),
-        ('excused', 'Excused'),
-    ]
-    status = models.CharField(max_length=10, choices=status_choices, default='present')
-
-    class Meta:
-        unique_together = ('student', 'date')
-
-    def __str__(self):
-        return f"{self.student.name} - {self.date} - {self.status}"
-
-
-class Timetable(models.Model):
-    school_class = models.ForeignKey('SchoolClass', on_delete=models.CASCADE, related_name='timetables')
-    day = models.CharField(max_length=10, choices=[
-        ('Monday', 'Monday'),
-        ('Tuesday', 'Tuesday'),
-        ('Wednesday', 'Wednesday'),
-        ('Thursday', 'Thursday'),
-        ('Friday', 'Friday'),
-        ('Saturday', 'Saturday'),
-    ])
-    start_time = models.TimeField()
-    end_time = models.TimeField()
-    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='timetables')
-
-    class Meta:
-        unique_together = ('school_class', 'day', 'start_time')
-
-    def __str__(self):
-        return f"{self.school_class.class_name} - {self.day} {self.start_time.strftime('%H:%M')} - {self.subject.name}"
 
 class Homework(models.Model):
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='homeworks')
@@ -332,3 +302,26 @@ class Syllabus(models.Model):
     def clean(self):
         if not self.teacher.subject_expert.filter(id=self.subject.id).exists():
             raise ValidationError("You can only add syllabus for subjects you are an expert in.")
+
+class Timetable(models.Model):
+    DAY_CHOICES = [
+        ('Mon', 'Monday'),
+        ('Tue', 'Tuesday'),
+        ('Wed', 'Wednesday'),
+        ('Thu', 'Thursday'),
+        ('Fri', 'Friday'),
+        ('Sat', 'Saturday'),
+    ]
+    school_class = models.ForeignKey(SchoolClass, on_delete=models.CASCADE, related_name='timetables')
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='timetables')
+    teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name='timetables')
+    day = models.CharField(max_length=3, choices=DAY_CHOICES)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+
+    class Meta:
+        unique_together = ('school_class', 'day', 'start_time')
+        ordering = ['school_class', 'day', 'start_time']
+
+    def __str__(self):
+        return f"{self.school_class} | {self.day} {self.start_time}-{self.end_time} | {self.subject} ({self.teacher})"

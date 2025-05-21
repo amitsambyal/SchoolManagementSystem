@@ -7,7 +7,13 @@ from django import forms
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q
 from django.contrib.admin.filters import RelatedFieldListFilter
-from .models import favicon, logo, CarouselItem, SchoolClass, SchoolFacility, AboutUs, CallToAction, Teacher, Appointment, TeamMember, Testimonial, FooterNewsletter, FooterSocialLink, Student, Attendance, Timetable, Homework, Subject, Syllabus
+from django.contrib import messages
+from datetime import time
+from django.urls import path
+from django.template.response import TemplateResponse
+from django.shortcuts import redirect
+from .models import favicon, logo, CarouselItem, SchoolClass, SchoolFacility, AboutUs, CallToAction, Teacher, Appointment, TeamMember, Testimonial, FooterNewsletter, FooterSocialLink, Student, Timetable, Homework, Subject, Syllabus
+from .forms import TimetableGenerationForm
 
 admin.site.site_header = "School Management System"
 admin.site.site_title = "School Admin Panel"
@@ -22,7 +28,6 @@ admin.site.register(CarouselItem)
 admin.site.register(SchoolFacility)
 admin.site.register(AboutUs)
 admin.site.register(CallToAction)
-admin.site.register(SchoolClass)
 admin.site.register(Appointment)
 admin.site.register(TeamMember)
 admin.site.register(Testimonial)
@@ -112,17 +117,6 @@ class StudentAdmin(admin.ModelAdmin):
         if not change:  # This is a new student
             obj.create_user_account()
 
-@admin.register(Attendance)
-class AttendanceAdmin(admin.ModelAdmin):
-    list_display = ('student', 'date', 'status')
-    list_filter = ('status', 'date')
-    search_fields = ('student__name',)
-
-@admin.register(Timetable)
-class TimetableAdmin(admin.ModelAdmin):
-    list_display = ('school_class', 'day', 'start_time', 'end_time', 'subject')
-    list_filter = ('day', 'school_class')
-    search_fields = ('school_class__class_name', 'subject__name')
 
 class CustomSubjectListFilter(RelatedFieldListFilter):
     def field_choices(self, field, request, model_admin):
@@ -327,3 +321,155 @@ class SyllabusAdmin(admin.ModelAdmin):
 
 admin.site.register(Syllabus, SyllabusAdmin)
 admin.site.register(Teacher, TeacherAdmin)
+
+@admin.register(Timetable)
+class TimetableAdmin(admin.ModelAdmin):
+    list_display = ('school_class', 'day', 'start_time', 'end_time', 'subject', 'teacher')
+    list_filter = ('school_class', 'day')
+    
+    def filter_timetable_by_class(self, school_class_str):
+        school_class = SchoolClass.objects.get(class_name=school_class_str)  # or use pk if you have it
+        return Timetable.objects.filter(school_class=school_class)
+
+@admin.register(SchoolClass)
+class SchoolClassAdmin(admin.ModelAdmin):
+    list_display = ('class_name', 'view_timetable_link')
+    actions = ['generate_timetable_action']
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path('generate-timetable/', self.admin_site.admin_view(self.generate_timetable_view), name='generate-timetable'),
+            path('view-timetable/<int:class_id>/', self.admin_site.admin_view(self.view_timetable), name='view-timetable'),
+        ]
+        return custom_urls + urls
+
+    def changelist_view(self, request, extra_context=None):
+        # Add a button to the changelist
+        extra_context = extra_context or {}
+        extra_context['generate_timetable_url'] = 'generate-timetable/'
+        return super().changelist_view(request, extra_context=extra_context)
+
+    def generate_timetable_view(self, request):
+        if request.method == 'POST':
+            form = TimetableGenerationForm(request.POST)
+            if form.is_valid():
+                start_hour = form.cleaned_data['start_hour']
+                end_hour = form.cleaned_data['end_hour']
+                period_minutes = form.cleaned_data['period_minutes']
+                break_start_hour = form.cleaned_data['break_start_hour']
+                break_minutes = form.cleaned_data['break_minutes']
+                selected_ids = request.session.pop('selected_class_ids', None)
+                if selected_ids:
+                    classes = SchoolClass.objects.filter(id__in=selected_ids)
+                else:
+                    classes = SchoolClass.objects.all()  # fallback, or you can show a warning
+                self._generate_timetable(
+                    request, classes,
+                    start_hour, end_hour, period_minutes,
+                    break_start_hour, break_minutes
+                )
+                self.message_user(request, "Timetable generated with custom timings and break!", messages.SUCCESS)
+                return redirect('..')
+        else:
+            form = TimetableGenerationForm()
+        context = dict(
+            self.admin_site.each_context(request),
+            form=form,
+        )
+        return TemplateResponse(request, "admin/generate_timetable_form.html", context)
+
+    def _generate_timetable(self, request, queryset, start_hour, end_hour, period_minutes, break_start_hour, break_minutes):
+        from datetime import time, timedelta, datetime
+        for school_class in queryset:
+            # Delete existing timetable entries for this class
+            Timetable.objects.filter(school_class=school_class).delete()
+            subjects = list(Subject.objects.filter(school_class=school_class))
+            teachers = Teacher.objects.filter(subject_expert__in=subjects).distinct()
+            days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+            class_teacher = school_class.class_teacher
+            if not class_teacher:
+                self.message_user(request, f"Class '{school_class.class_name}' has no class teacher assigned!", messages.WARNING)
+                continue
+            total_periods = int(((end_hour - start_hour) * 60) / period_minutes)
+            for day in days:
+                assigned_subjects = set()
+                period_start = datetime(2000, 1, 1, start_hour, 0)
+                period = 0
+
+                # Assign first period to class teacher if possible
+                if class_teacher:
+                    ct_subject = next((s for s in subjects if class_teacher.subject_expert.filter(pk=s.pk).exists()), None)
+                    if ct_subject:
+                        Timetable.objects.create(
+                            school_class=school_class,
+                            subject=ct_subject,
+                            teacher=class_teacher,
+                            day=day,
+                            start_time=period_start.time(),
+                            end_time=(period_start + timedelta(minutes=period_minutes)).time(),
+                        )
+                        assigned_subjects.add(ct_subject.pk)
+                        period += 1
+                        period_start += timedelta(minutes=period_minutes)
+
+                # Assign remaining periods
+                for _ in range(period, total_periods):
+                    # Insert break if needed
+                    if period_start.hour == break_start_hour:
+                        period_start += timedelta(minutes=break_minutes)
+                    # Find next unassigned subject and teacher
+                    next_subject = next((s for s in subjects if s.pk not in assigned_subjects), None)
+                    if not next_subject:
+                        break
+                    teacher = teachers.filter(subject_expert=next_subject).exclude(pk=getattr(class_teacher, 'pk', None)).first()
+                    if not teacher:
+                        assigned_subjects.add(next_subject.pk)  # Prevent infinite loop
+                        continue
+                    Timetable.objects.create(
+                        school_class=school_class,
+                        subject=next_subject,
+                        teacher=teacher,
+                        day=day,
+                        start_time=period_start.time(),
+                        end_time=(period_start + timedelta(minutes=period_minutes)).time(),
+                    )
+                    assigned_subjects.add(next_subject.pk)
+                    period += 1
+                    period_start += timedelta(minutes=period_minutes)
+
+    def view_timetable_link(self, obj):
+        return format_html(
+            '<a class="button" href="{}">View Timetable</a>',
+            f'view-timetable/{obj.pk}/'
+        )
+    view_timetable_link.short_description = "Timetable"
+
+    def view_timetable(self, request, class_id):
+        school_class = SchoolClass.objects.get(pk=class_id)
+        timetable = Timetable.objects.filter(school_class=school_class).order_by('day', 'start_time')
+        days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+        timetable_dict = {day: [] for day in days}
+        for entry in timetable:
+            timetable_dict[entry.day].append(entry)
+        context = dict(
+            self.admin_site.each_context(request),
+            school_class=school_class,
+            timetable_dict=timetable_dict,
+            days=days,
+        )
+        return TemplateResponse(request, "admin/class_timetable.html", context)
+
+    def generate_timetable_action(self, request, queryset):
+        """
+        Admin action to generate timetable for selected classes.
+        Prompts for timings using the same form as the custom view.
+        """
+        from django.http import HttpResponseRedirect
+        from django.urls import reverse
+
+        # Store selected IDs in session to use in the form view
+        request.session['selected_class_ids'] = list(queryset.values_list('id', flat=True))
+        return HttpResponseRedirect(reverse('admin:generate-timetable'))
+
+    generate_timetable_action.short_description = "Generate timetable for selected classes"

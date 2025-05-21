@@ -9,4 +9,4 @@ urlpatterns = [
     path('syllabus/', views.syllabus, name='syllabus'),
     # path('password_change/', auth_views.PasswordChangeView.as_view(), name='password_change'),  # Add this line
     path('subjects/<int:class_id>/', views.get_subjects_by_class, name='get_subjects_by_class'),
-]
+   ]

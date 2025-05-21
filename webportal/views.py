@@ -1,7 +1,7 @@
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from .models import favicon, logo, CarouselItem, SchoolClass, SchoolFacility, AboutUs, CallToAction, \
-      Teacher, Appointment, TeamMember, Testimonial, FooterNewsletter, FooterSocialLink, SchoolClass, Syllabus
+      Teacher, Appointment, TeamMember, Testimonial, FooterNewsletter, FooterSocialLink, SchoolClass, Syllabus, Subject
 from django.contrib.auth import login
 from django.contrib.auth.views import LoginView
 from django.shortcuts import redirect
@@ -75,11 +75,10 @@ class CustomLoginView(LoginView):
             return redirect('password_change')  # Ensure this URL name matches your password change view
         return super().form_valid(form)
 
-
-
 def get_subjects_by_class(request, class_id):
     school_class = get_object_or_404(SchoolClass, id=class_id)
     subjects = school_class.subjects.all()
     subject_data = [{'id': subject.id, 'name': subject.name} for subject in subjects]
     return JsonResponse({'subjects': subject_data})
+
 
