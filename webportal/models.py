@@ -325,3 +325,4 @@ class Timetable(models.Model):
 
     def __str__(self):
         return f"{self.school_class} | {self.day} {self.start_time}-{self.end_time} | {self.subject} ({self.teacher})"
+

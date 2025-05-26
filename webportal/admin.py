@@ -129,9 +129,25 @@ class CustomSubjectListFilter(RelatedFieldListFilter):
         else:
             return super().field_choices(field, request, model_admin)
 
+class CustomTeacherListFilter(RelatedFieldListFilter):
+    def field_choices(self, field, request, model_admin):
+        if hasattr(request.user, 'teacher_profile'):
+            teacher = request.user.teacher_profile
+            return [(t.pk, str(t)) for t in Teacher.objects.filter(subject_expert__in=Subject.objects.filter(expert_teachers=teacher))]
+        elif hasattr(request.user, 'student_profile'):
+            student = request.user.student_profile
+            subject_id = request.GET.get('subject__id__exact')
+            if subject_id:
+                subject = Subject.objects.get(pk=subject_id)
+                return [(t.pk, str(t)) for t in Teacher.objects.filter(subject_expert=subject)]
+            else:
+                return [(t.pk, str(t)) for t in Teacher.objects.filter(subject_expert__in=Subject.objects.filter(school_class=student.school_class))]
+        else:
+            return super().field_choices(field, request, model_admin)        
+
 class HomeworkAdmin(admin.ModelAdmin):
     list_display = ('title', 'subject', 'teacher', 'assigned_date', 'due_date', 'created_at', 'updated_at')
-    list_filter = (('subject', CustomSubjectListFilter), 'teacher', 'assigned_date', 'due_date')
+    list_filter = (('subject', CustomSubjectListFilter), ('teacher', CustomTeacherListFilter) , 'assigned_date', 'due_date')
     search_fields = ('title', 'description')
 
     def get_readonly_fields(self, request, obj=None):
@@ -160,6 +176,14 @@ class HomeworkAdmin(admin.ModelAdmin):
             student = request.user.student_profile
             return qs.filter(subject__school_class=student.school_class)
         return qs.none()
+    
+    def get_list_filter(self, request):
+        if hasattr(request.user, 'student_profile'):
+            return (('subject', CustomSubjectListFilter), ('teacher', CustomTeacherListFilter), 'assigned_date', 'due_date')
+        elif hasattr(request.user, 'teacher_profile'):
+            return (('subject', CustomSubjectListFilter), 'assigned_date', 'due_date')
+        else:
+            return super().get_list_filter(request)
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         from datetime import date
@@ -174,6 +198,10 @@ class HomeworkAdmin(admin.ModelAdmin):
             elif hasattr(request.user, 'student_profile'):
                 student = request.user.student_profile
                 kwargs["queryset"] = Subject.objects.filter(school_class=student.school_class)
+        if db_field.name == "teacher":
+            if hasattr(request.user, 'teacher_profile'):
+                # Only show the logged-in teacher in the dropdown
+                kwargs["queryset"] = Teacher.objects.filter(pk=request.user.teacher_profile.pk)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def save_model(self, request, obj, form, change):
@@ -245,14 +273,27 @@ class TeacherAdmin(admin.ModelAdmin):
     list_display = ('name', 'email', 'mobile')
     filter_horizontal = ('subject_expert',)
 
-    def save_model(self, request, obj, form, change):
-        super().save_model(request, obj, form, change)
-        if not change:  # This is a new teacher
-            obj.create_user_account()
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if hasattr(request.user, 'student_profile'):
+            # Only teachers who teach subjects in the student's class
+            student = request.user.student_profile
+            subjects = student.school_class.subjects.all()
+            return qs.filter(subject_expert__in=subjects).distinct()
+        return qs
+    
+    def get_list_filter(self, request):
+        if hasattr(request.user, 'student_profile'):
+            return ('subject_expert',)
+        return super().get_list_filter(request)
+
+admin.site.register(Teacher, TeacherAdmin)
+
+
 
 class SyllabusAdmin(admin.ModelAdmin):
     list_display = ('title', 'subject', 'teacher', 'created_at', 'updated_at')
-    list_filter = (('subject', CustomSubjectListFilter), 'teacher')
+    list_filter = (('subject', CustomSubjectListFilter), ('teacher', CustomTeacherListFilter))
     search_fields = ('title', 'content')
 
     def get_readonly_fields(self, request, obj=None):
@@ -284,6 +325,14 @@ class SyllabusAdmin(admin.ModelAdmin):
             student = request.user.student_profile
             return qs.filter(subject__school_class=student.school_class)
         return qs.none()
+    
+    def get_list_filter(self, request):
+        if hasattr(request.user, 'student_profile'):
+            return (('subject', CustomSubjectListFilter), ('teacher', CustomTeacherListFilter))
+        elif hasattr(request.user, 'teacher_profile'):
+            return (('subject', CustomSubjectListFilter),)
+        else:
+            return super().get_list_filter(request)
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "subject":
@@ -293,6 +342,10 @@ class SyllabusAdmin(admin.ModelAdmin):
             elif hasattr(request.user, 'student_profile'):
                 student = request.user.student_profile
                 kwargs["queryset"] = Subject.objects.filter(school_class=student.school_class)
+        if db_field.name == "teacher":
+            if hasattr(request.user, 'teacher_profile'):
+                # Only show the logged-in teacher in the dropdown
+                kwargs["queryset"] = Teacher.objects.filter(pk=request.user.teacher_profile.pk)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def has_add_permission(self, request):
@@ -320,13 +373,23 @@ class SyllabusAdmin(admin.ModelAdmin):
         return False
 
 admin.site.register(Syllabus, SyllabusAdmin)
-admin.site.register(Teacher, TeacherAdmin)
 
 @admin.register(Timetable)
 class TimetableAdmin(admin.ModelAdmin):
     list_display = ('school_class', 'day', 'start_time', 'end_time', 'subject', 'teacher')
     list_filter = ('school_class', 'day')
-    
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if hasattr(request.user, 'student_profile'):
+            # Only show timetable for the student's class
+            student = request.user.student_profile
+            return qs.filter(school_class=student.school_class)
+        return qs
+    def get_list_filter(self, request):
+        if hasattr(request.user, 'student_profile'):
+            return ('day',)
+        return super().get_list_filter(request)
+
     def filter_timetable_by_class(self, school_class_str):
         school_class = SchoolClass.objects.get(class_name=school_class_str)  # or use pk if you have it
         return Timetable.objects.filter(school_class=school_class)
