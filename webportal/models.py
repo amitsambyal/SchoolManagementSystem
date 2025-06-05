@@ -265,7 +265,6 @@ def update_user_account(sender, instance, created, **kwargs):
 class Homework(models.Model):
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='homeworks')
     teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name='homeworks')
-    title = models.CharField(max_length=255, help_text="Title of the homework", default="Untitled Homework")
     description = CKEditor5Field(help_text="Detailed description of the homework", config_name='extends', default="No description provided.")
     assigned_date = models.DateField(help_text="Date when the homework was assigned", default=date.today)
     due_date = models.DateField(help_text="Date when the homework is due", default=date.today)
@@ -274,10 +273,10 @@ class Homework(models.Model):
 
     class Meta:
         verbose_name_plural = "Homeworks"
-        unique_together = ('subject', 'title')
+        unique_together = ('subject', 'assigned_date')  # Changed from ('subject', 'title')
 
     def __str__(self):
-        return f"{self.subject.name} Homework: {self.title}"
+        return f"{self.subject.name} Homework ({self.assigned_date})"
 
     def clean(self):
         # Ensure the teacher is an expert in the subject
@@ -325,4 +324,29 @@ class Timetable(models.Model):
 
     def __str__(self):
         return f"{self.school_class} | {self.day} {self.start_time}-{self.end_time} | {self.subject} ({self.teacher})"
+    
+class Attendance(models.Model):
+    ATTENDANCE_STATUS = [
+        ('present', 'Present'),
+        ('absent', 'Absent'),
+        ('leave', 'Leave'),
+    ]
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='attendances')
+    school_class = models.ForeignKey(SchoolClass, on_delete=models.CASCADE, related_name='attendances')
+    date = models.DateField()
+    status = models.CharField(max_length=10, choices=ATTENDANCE_STATUS)
+    marked_by = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name='marked_attendances')
+    marked_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('student', 'date')
+        ordering = ['-date', 'student']
+
+    def clean(self):
+        # Only class teacher can mark attendance for their class
+        if self.school_class.class_teacher != self.marked_by:
+            raise ValidationError("Only the class teacher can mark attendance for this class.")
+
+    def __str__(self):
+        return f"{self.student.name} - {self.date} - {self.status}"
 

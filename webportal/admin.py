@@ -12,8 +12,9 @@ from datetime import time
 from django.urls import path
 from django.template.response import TemplateResponse
 from django.shortcuts import redirect
-from .models import favicon, logo, CarouselItem, SchoolClass, SchoolFacility, AboutUs, CallToAction, Teacher, Appointment, TeamMember, Testimonial, FooterNewsletter, FooterSocialLink, Student, Timetable, Homework, Subject, Syllabus
+from .models import favicon, logo, CarouselItem, SchoolClass, SchoolFacility, AboutUs, CallToAction, Teacher, Appointment, TeamMember, Testimonial, FooterNewsletter, FooterSocialLink, Student, Timetable, Homework, Subject, Syllabus, Attendance
 from .forms import TimetableGenerationForm
+from django.forms.models import BaseInlineFormSet  # <-- Add this line
 
 admin.site.site_header = "School Management System"
 admin.site.site_title = "School Admin Panel"
@@ -46,10 +47,10 @@ class StudentAdminForm(forms.ModelForm):
 class StudentAdmin(admin.ModelAdmin):
     form = StudentAdminForm
     list_display = ('name', 'roll_no', 'phone_no', 'age_display', 'school_class', 'pen_number')
-    readonly_fields = ('image_tag', 'syllabus_homework_overview')
+    readonly_fields = ('image_tag',)
     list_filter = ('school_class',)
     search_fields = ('name', 'roll_no')
-
+   
     fieldsets = (
         ('Personal Information', {
             'fields': ('name', 'roll_no', 'phone_no', 'date_of_birth', 'gender', 'image', 'image_tag')
@@ -60,14 +61,15 @@ class StudentAdmin(admin.ModelAdmin):
         ('Academic Information', {
             'fields': ('school_class','pen_number')
         }),
-        ('Syllabus & Homework', {
-            'fields': ('syllabus_homework_overview',)
-        }),
+       # ('Syllabus & Homework', {
+        #    'fields': ('syllabus_homework_overview',)
+        #}
+        # ),
     )
 
     def image_tag(self, obj):
         if obj.image:
-            return format_html('<img src="{}" width="100" height="100" />', obj.image.url)
+            return format_html('<img src="{}" width="100" height="100" style="border-radius:8px;margin-bottom:10px;" />', obj.image.url)
         return "-"
     image_tag.short_description = 'Image'
 
@@ -75,42 +77,120 @@ class StudentAdmin(admin.ModelAdmin):
         return obj.age
     age_display.short_description = 'Age'
     
-    def syllabus_homework_overview(self, obj):
-        html = '<div style="padding:10px;">'
-        subjects = obj.school_class.subjects.all()
-        for subject in subjects:
-            html += f'<div style="margin-bottom:20px;padding:10px;border:1px solid #eee;border-radius:6px;background:#f9f9fc;">'
-            html += f'<h4 style="color:#007bff;">{subject.name}</h4>'
-            # Syllabus
-            syllabus = subject.syllabi.all()
-            html += '<div><strong>Syllabus:</strong>'
-            if syllabus:
-                for s in syllabus:
-                    clean_content = strip_tags(s.content)
-                    html += f'<div style="margin:5px 0 10px 0;padding:8px;background:#f1f3f6;border-radius:4px;">'
-                    html += f'<b>{s.title}</b><br>{clean_content}'
-                    html += f'<br><em>Teacher: {s.teacher.name}</em>'
-                    html += '</div>'
-            else:
-                html += '<div style="color:#888;">No syllabus available.</div>'
-            html += '</div>'
-            # Homework
-            homeworks = subject.homeworks.filter(subject__school_class=obj.school_class).order_by('-assigned_date')
-            html += '<div style="margin-top:10px;"><strong>Homework:</strong>'
-            if homeworks:
-                for hw in homeworks:
-                    clean_desc = strip_tags(hw.description)
-                    html += f'<div style="margin:5px 0 10px 0;padding:8px;background:#f8f9fa;border-radius:4px;">'
-                    html += f'<b>{hw.title}</b><br>{clean_desc}'
-                    html += f'<br><span style="font-size:0.95em;color:#888;">Assigned: {hw.assigned_date} | Due: {hw.due_date}</span>'
-                    html += '</div>'
-            else:
-                html += '<div style="color:#888;">No homework assigned.</div>'
-            html += '</div>'
-            html += '</div>'
-        html += '</div>'
-        return mark_safe(html)
-    syllabus_homework_overview.short_description = "Syllabus & Homework Overview"
+   # def syllabus_homework_overview(self, obj):
+#     # Get all homework dates for this class
+#     homework_dates = (
+#         Homework.objects.filter(subject__school_class=obj.school_class)
+#         .order_by('-assigned_date')
+#         .values_list('assigned_date', flat=True)
+#         .distinct()
+#     )
+#     # Get selected date from GET params (admin uses request.GET)
+#     request = getattr(self, 'request', None)
+#     selected_date = None
+#     if request:
+#         date_str = request.GET.get('homework_date')
+#         if date_str:
+#             from datetime import datetime
+#             try:
+#                 selected_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+#             except ValueError:
+#                 selected_date = None
+#     if not selected_date and homework_dates:
+#         selected_date = homework_dates[0]
+#
+#     # Responsive CSS
+#     html = '''
+#     <style>
+#     .hw-responsive-container {
+#         padding: 10px;
+#         width: 100%;
+#         max-width: 100%;
+#         box-sizing: border-box;
+#     }
+#     .hw-subject-block {
+#         margin-bottom: 20px;
+#         padding: 10px;
+#         border: 1px solid #eee;
+#         border-radius: 6px;
+#         background: #f9f9fc;
+#         width: 100%;
+#         max-width: 100%;
+#         box-sizing: border-box;
+#         overflow-wrap: break-word;
+#     }
+#     .hw-subject-block h4 {
+#         color: #007bff;
+#         margin-top: 0;
+#         word-break: break-word;
+#     }
+#     .hw-homework-block {
+#         margin: 5px 0 10px 0;
+#         padding: 8px;
+#         background: #f8f9fa;
+#         border-radius: 4px;
+#         word-break: break-word;
+#         width: 100%;
+#         max-width: 100%;
+#         box-sizing: border-box;
+#         overflow-wrap: break-word;
+#     }
+#     @media (max-width: 900px) {
+#         .hw-subject-block, .hw-homework-block {
+#             padding: 6px;
+#             font-size: 0.98em;
+#         }
+#         .hw-subject-block h4 {
+#             font-size: 1.1em;
+#         }
+#     }
+#     @media (max-width: 600px) {
+#         .hw-subject-block, .hw-homework-block {
+#             padding: 4px;
+#             font-size: 0.95em;
+#         }
+#         .hw-subject-block h4 {
+#             font-size: 1em;
+#         }
+#     }
+#     </style>
+#     <div class="hw-responsive-container">
+#     '''
+#     # Date filter dropdown
+#     html += '<form method="get" style="margin-bottom:20px;">'
+#     html += '<label for="homework_date"><b>Select Date:</b></label> '
+#     html += '<select name="homework_date" id="homework_date" onchange="this.form.submit()">'
+#     for d in homework_dates:
+#         html += f'<option value="{d}" {"selected" if d == selected_date else ""}>{d}</option>'
+#     html += '</select>'
+#     # Keep other GET params
+#     for key, value in (request.GET.items() if request else []):
+#         if key != 'homework_date':
+#             html += f'<input type="hidden" name="{key}" value="{value}">'
+#     html += '</form>'
+#
+#     # Subjects and homework for selected date
+#     subjects = obj.school_class.subjects.all()
+#     for subject in subjects:
+#         html += f'<div class="hw-subject-block">'
+#         html += f'<h4>{subject.name}</h4>'
+#         homeworks = subject.homeworks.filter(subject__school_class=obj.school_class, assigned_date=selected_date)
+#         html += '<div style="margin-top:10px;"><strong>Homework:</strong>'
+#         if homeworks:
+#             for hw in homeworks:
+#                 clean_desc = strip_tags(hw.description)
+#                 html += (
+#                     f'<div class="hw-homework-block">'
+#                     f'{clean_desc}'
+#                     f'<br><span style="font-size:0.95em;color:#888;">Assigned: {hw.assigned_date} | Due: {hw.due_date}</span>'
+#                     f'</div>'
+#                 )
+#         else:
+#             html += '<div style="color:#888;">No homework assigned.</div>'
+#         html += '</div></div>'
+#     html += '</div>'
+#     return mark_safe(html)
+# syllabus_homework_overview.short_description = "Homework Overview"
 
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
@@ -146,25 +226,43 @@ class CustomTeacherListFilter(RelatedFieldListFilter):
             return super().field_choices(field, request, model_admin)        
 
 class HomeworkAdmin(admin.ModelAdmin):
-    list_display = ('title', 'subject', 'teacher', 'assigned_date', 'due_date', 'created_at', 'updated_at')
-    list_filter = (('subject', CustomSubjectListFilter), ('teacher', CustomTeacherListFilter) , 'assigned_date', 'due_date')
-    search_fields = ('title', 'description')
+    list_display = ('subject', 'html_description')
+    list_filter = (('subject', CustomSubjectListFilter), ('teacher', CustomTeacherListFilter), 'assigned_date', 'due_date')
+    search_fields = ('description',)  # Removed 'title'
 
     def get_readonly_fields(self, request, obj=None):
         if hasattr(request.user, 'student_profile'):
-            return ['subject', 'teacher', 'title', 'assigned_date', 'due_date', 'html_description', 'created_at', 'updated_at']
-        # For teachers and superusers, show created_at and updated_at as read-only
+            return ['subject', 'teacher', 'assigned_date', 'due_date', 'html_description', 'created_at', 'updated_at']
         return ['created_at', 'updated_at'] + list(super().get_readonly_fields(request, obj))
 
     def html_description(self, obj):
-        return mark_safe(obj.description)
+        # Responsive CSS for description, but keep HTML tags (including images)
+        return mark_safe(f"""
+            <style>
+            .responsive-description {{
+                word-break: break-word;
+                max-width: 100%;
+                box-sizing: border-box;
+                padding: 8px;
+                background: #f8f9fa;
+                border-radius: 4px;
+                margin-bottom: 8px;
+            }}
+            @media (max-width: 600px) {{
+                .responsive-description {{
+                    font-size: 0.97em;
+                    padding: 5px;
+                }}
+            }}
+            </style>
+            <div class="responsive-description">{obj.description}</div>
+        """)
     html_description.short_description = "Description"
 
     def get_fields(self, request, obj=None):
         if hasattr(request.user, 'student_profile'):
-            return ['subject', 'teacher', 'title', 'html_description', 'assigned_date', 'due_date']
-        # Only include editable fields for the form, not id/created_at/updated_at
-        return ['subject', 'teacher', 'title', 'description', 'assigned_date', 'due_date']
+            return ['subject', 'teacher', 'html_description', 'assigned_date', 'due_date']
+        return ['subject', 'teacher', 'description', 'assigned_date', 'due_date']
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -536,3 +634,69 @@ class SchoolClassAdmin(admin.ModelAdmin):
         return HttpResponseRedirect(reverse('admin:generate-timetable'))
 
     generate_timetable_action.short_description = "Generate timetable for selected classes"
+
+class AttendanceForm(forms.ModelForm):
+    class Meta:
+        model = Attendance
+        fields = ['student', 'date', 'status']
+
+class AttendanceInlineFormSet(BaseInlineFormSet):
+    def get_queryset(self):
+        qs = super().get_queryset()
+        # Only show attendance for students in the class teacher's class
+        request = self.request
+        if hasattr(request.user, 'teacher_profile'):
+            school_class = request.user.teacher_profile.class_teacher_of
+            return qs.filter(student__school_class=school_class)
+        return qs
+
+class AttendanceAdmin(admin.ModelAdmin):
+    list_display = ('student', 'school_class', 'date', 'status', 'marked_by', 'marked_at')
+    list_filter = ('school_class', 'date', 'status')
+    search_fields = ('student__name', 'school_class__class_name')
+    actions = ['mark_present', 'mark_absent', 'mark_leave']
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        if hasattr(request.user, 'teacher_profile'):
+            # Only show attendance for the class teacher's class
+            school_class = request.user.teacher_profile.class_teacher_of
+            return qs.filter(school_class=school_class)
+        return qs.none()
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        # Limit student choices to the class teacher's class
+        if hasattr(request.user, 'teacher_profile'):
+            school_class = request.user.teacher_profile.class_teacher_of
+            form.base_fields['student'].queryset = Student.objects.filter(school_class=school_class)
+            form.base_fields['school_class'].initial = school_class
+            form.base_fields['school_class'].disabled = True
+        return form
+
+    def save_model(self, request, obj, form, change):
+        # Set marked_by to the logged-in teacher
+        if hasattr(request.user, 'teacher_profile'):
+            obj.marked_by = request.user.teacher_profile
+            obj.school_class = request.user.teacher_profile.class_teacher_of
+        super().save_model(request, obj, form, change)
+
+    def mark_present(self, request, queryset):
+        queryset.update(status='present')
+    mark_present.short_description = "Mark selected as Present"
+
+    def mark_absent(self, request, queryset):
+        queryset.update(status='absent')
+    mark_absent.short_description = "Mark selected as Absent"
+
+    def mark_leave(self, request, queryset):
+        queryset.update(status='leave')
+    mark_leave.short_description = "Mark selected as Leave"
+
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        self.request = request  # So the method above can access GET params
+        return super().change_view(request, object_id, form_url, extra_context)
+
+admin.site.register(Attendance, AttendanceAdmin)
