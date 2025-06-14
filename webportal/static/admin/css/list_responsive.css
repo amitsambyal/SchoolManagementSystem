@@ -1,0 +1,14 @@
+@media (max-width: 900px) {
+    .change-list #result_list {
+        display: block;
+        width: 100%;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+    .change-list #result_list th,
+    .change-list #result_list td {
+        white-space: normal;
+        min-width: 120px;
+        word-break: break-word;
+    }
+}

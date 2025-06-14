@@ -145,7 +145,7 @@ class SchoolClass(models.Model):
     class_name = models.CharField(max_length=255, help_text="The name of the class (e.g., 'Class1,Class2')")
     class_image = models.ImageField(upload_to='class_images/', help_text="Image representing the class")
     age_group = models.CharField(max_length=50, help_text="Age group for the class (e.g., '3-5 Years')")
-    time = models.CharField(max_length=50, help_text="Time when the class is held (e.g., '9-10 AM')")
+    #time = models.CharField(max_length=50, help_text="Time when the class is held (e.g., '9-10 AM')")
     capacity = models.IntegerField(help_text="Maximum capacity of students in the class")
     class_teacher = models.ForeignKey(
         'Teacher',
@@ -349,4 +349,20 @@ class Attendance(models.Model):
 
     def __str__(self):
         return f"{self.student.name} - {self.date} - {self.status}"
+
+class StudentDiary(models.Model):
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='diary_entries')
+    teacher = models.ForeignKey(Teacher, on_delete=models.SET_NULL, null=True, blank=True, related_name='diary_entries')
+    date = models.DateField(default=date.today)
+    title = models.CharField(max_length=255, help_text="Title or subject of the diary entry")
+    entry = models.TextField(help_text="Diary entry or note")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name_plural = "Student Diaries"
+        ordering = ['-date', 'student']
+
+    def __str__(self):
+        return f"{self.student.name} - {self.title} ({self.date})"
 

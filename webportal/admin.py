@@ -12,9 +12,11 @@ from datetime import time
 from django.urls import path
 from django.template.response import TemplateResponse
 from django.shortcuts import redirect
-from .models import favicon, logo, CarouselItem, SchoolClass, SchoolFacility, AboutUs, CallToAction, Teacher, Appointment, TeamMember, Testimonial, FooterNewsletter, FooterSocialLink, Student, Timetable, Homework, Subject, Syllabus, Attendance
+from .models import favicon, logo, CarouselItem, SchoolClass, SchoolFacility, AboutUs, CallToAction, Teacher, Appointment, TeamMember, Testimonial, FooterNewsletter, FooterSocialLink, Student, Timetable, Homework, Subject, Syllabus, Attendance, StudentDiary
 from .forms import TimetableGenerationForm
 from django.forms.models import BaseInlineFormSet  # <-- Add this line
+from django.utils import timezone
+from django.contrib.admin.views.main import ChangeList
 
 admin.site.site_header = "School Management System"
 admin.site.site_title = "School Admin Panel"
@@ -61,12 +63,8 @@ class StudentAdmin(admin.ModelAdmin):
         ('Academic Information', {
             'fields': ('school_class','pen_number')
         }),
-       # ('Syllabus & Homework', {
-        #    'fields': ('syllabus_homework_overview',)
-        #}
-        # ),
     )
-
+    
     def image_tag(self, obj):
         if obj.image:
             return format_html('<img src="{}" width="100" height="100" style="border-radius:8px;margin-bottom:10px;" />', obj.image.url)
@@ -75,127 +73,62 @@ class StudentAdmin(admin.ModelAdmin):
 
     def age_display(self, obj):
         return obj.age
-    age_display.short_description = 'Age'
-    
-   # def syllabus_homework_overview(self, obj):
-#     # Get all homework dates for this class
-#     homework_dates = (
-#         Homework.objects.filter(subject__school_class=obj.school_class)
-#         .order_by('-assigned_date')
-#         .values_list('assigned_date', flat=True)
-#         .distinct()
-#     )
-#     # Get selected date from GET params (admin uses request.GET)
-#     request = getattr(self, 'request', None)
-#     selected_date = None
-#     if request:
-#         date_str = request.GET.get('homework_date')
-#         if date_str:
-#             from datetime import datetime
-#             try:
-#                 selected_date = datetime.strptime(date_str, "%Y-%m-%d").date()
-#             except ValueError:
-#                 selected_date = None
-#     if not selected_date and homework_dates:
-#         selected_date = homework_dates[0]
-#
-#     # Responsive CSS
-#     html = '''
-#     <style>
-#     .hw-responsive-container {
-#         padding: 10px;
-#         width: 100%;
-#         max-width: 100%;
-#         box-sizing: border-box;
-#     }
-#     .hw-subject-block {
-#         margin-bottom: 20px;
-#         padding: 10px;
-#         border: 1px solid #eee;
-#         border-radius: 6px;
-#         background: #f9f9fc;
-#         width: 100%;
-#         max-width: 100%;
-#         box-sizing: border-box;
-#         overflow-wrap: break-word;
-#     }
-#     .hw-subject-block h4 {
-#         color: #007bff;
-#         margin-top: 0;
-#         word-break: break-word;
-#     }
-#     .hw-homework-block {
-#         margin: 5px 0 10px 0;
-#         padding: 8px;
-#         background: #f8f9fa;
-#         border-radius: 4px;
-#         word-break: break-word;
-#         width: 100%;
-#         max-width: 100%;
-#         box-sizing: border-box;
-#         overflow-wrap: break-word;
-#     }
-#     @media (max-width: 900px) {
-#         .hw-subject-block, .hw-homework-block {
-#             padding: 6px;
-#             font-size: 0.98em;
-#         }
-#         .hw-subject-block h4 {
-#             font-size: 1.1em;
-#         }
-#     }
-#     @media (max-width: 600px) {
-#         .hw-subject-block, .hw-homework-block {
-#             padding: 4px;
-#             font-size: 0.95em;
-#         }
-#         .hw-subject-block h4 {
-#             font-size: 1em;
-#         }
-#     }
-#     </style>
-#     <div class="hw-responsive-container">
-#     '''
-#     # Date filter dropdown
-#     html += '<form method="get" style="margin-bottom:20px;">'
-#     html += '<label for="homework_date"><b>Select Date:</b></label> '
-#     html += '<select name="homework_date" id="homework_date" onchange="this.form.submit()">'
-#     for d in homework_dates:
-#         html += f'<option value="{d}" {"selected" if d == selected_date else ""}>{d}</option>'
-#     html += '</select>'
-#     # Keep other GET params
-#     for key, value in (request.GET.items() if request else []):
-#         if key != 'homework_date':
-#             html += f'<input type="hidden" name="{key}" value="{value}">'
-#     html += '</form>'
-#
-#     # Subjects and homework for selected date
-#     subjects = obj.school_class.subjects.all()
-#     for subject in subjects:
-#         html += f'<div class="hw-subject-block">'
-#         html += f'<h4>{subject.name}</h4>'
-#         homeworks = subject.homeworks.filter(subject__school_class=obj.school_class, assigned_date=selected_date)
-#         html += '<div style="margin-top:10px;"><strong>Homework:</strong>'
-#         if homeworks:
-#             for hw in homeworks:
-#                 clean_desc = strip_tags(hw.description)
-#                 html += (
-#                     f'<div class="hw-homework-block">'
-#                     f'{clean_desc}'
-#                     f'<br><span style="font-size:0.95em;color:#888;">Assigned: {hw.assigned_date} | Due: {hw.due_date}</span>'
-#                     f'</div>'
-#                 )
-#         else:
-#             html += '<div style="color:#888;">No homework assigned.</div>'
-#         html += '</div></div>'
-#     html += '</div>'
-#     return mark_safe(html)
-# syllabus_homework_overview.short_description = "Homework Overview"
+    age_display.short_description = 'Age'    
+  
+    def get_list_filter(self, request):
+        # Remove class filter for teachers
+        if hasattr(request.user, 'teacher_profile'):
+            return ()
+        return super().get_list_filter(request)
+
+    def has_add_permission(self, request):
+        # Only allow class teachers and superusers to add students
+        if request.user.is_superuser:
+            return True
+        if hasattr(request.user, 'teacher_profile'):
+            # Only allow if the teacher is a class teacher of any class
+            return SchoolClass.objects.filter(class_teacher=request.user.teacher_profile).exists()
+        return False
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        # Restrict school_class dropdown to only the class where the teacher is class teacher
+        if hasattr(request.user, 'teacher_profile'):
+            school_classes = SchoolClass.objects.filter(class_teacher=request.user.teacher_profile)
+            if 'school_class' in form.base_fields:
+                form.base_fields['school_class'].queryset = school_classes
+                if school_classes.count() == 1:
+                    form.base_fields['school_class'].initial = school_classes.first()
+                    form.base_fields['school_class'].disabled = True
+        return form
 
     def save_model(self, request, obj, form, change):
+        # Always set the class to the teacher's class, regardless of submitted data
+        if hasattr(request.user, 'teacher_profile'):
+            school_class = SchoolClass.objects.filter(class_teacher=request.user.teacher_profile).first()
+            if school_class:
+                obj.school_class = school_class
         super().save_model(request, obj, form, change)
-        if not change:  # This is a new student
+        if not change:
             obj.create_user_account()
+
+    
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        if hasattr(request.user, 'teacher_profile'):
+            # Show students in classes where the teacher is a subject expert
+            expert_classes = SchoolClass.objects.filter(subjects__in=request.user.teacher_profile.subject_expert.all()).distinct()
+            return qs.filter(school_class__in=expert_classes)
+        return qs.none()
+    
+    def get_fields(self, request, obj=None):
+        fields = super().get_fields(request, obj)
+        if hasattr(request.user, 'teacher_profile'):
+            # Remove 'school_class' from the form for teachers
+            return [f for f in fields if f != 'school_class'] + ['school_class']
+        return fields
 
 
 class CustomSubjectListFilter(RelatedFieldListFilter):
@@ -654,33 +587,39 @@ class AttendanceAdmin(admin.ModelAdmin):
     list_display = ('student', 'school_class', 'date', 'status', 'marked_by', 'marked_at')
     list_filter = ('school_class', 'date', 'status')
     search_fields = ('student__name', 'school_class__class_name')
-    actions = ['mark_present', 'mark_absent', 'mark_leave']
+    actions = ['mark_present', 'mark_absent', 'mark_leave', 'mark_all_present_today']
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         if request.user.is_superuser:
             return qs
         if hasattr(request.user, 'teacher_profile'):
-            # Only show attendance for the class teacher's class
-            school_class = request.user.teacher_profile.class_teacher_of
-            return qs.filter(school_class=school_class)
+            # Allow teacher to view attendance for all classes where they are a subject expert
+            expert_classes = SchoolClass.objects.filter(subjects__in=request.user.teacher_profile.subject_expert.all()).distinct()
+            return qs.filter(school_class__in=expert_classes)
         return qs.none()
 
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
-        # Limit student choices to the class teacher's class
         if hasattr(request.user, 'teacher_profile'):
-            school_class = request.user.teacher_profile.class_teacher_of
-            form.base_fields['student'].queryset = Student.objects.filter(school_class=school_class)
-            form.base_fields['school_class'].initial = school_class
-            form.base_fields['school_class'].disabled = True
+            school_classes = SchoolClass.objects.filter(class_teacher=request.user.teacher_profile)
+            form.base_fields['student'].queryset = Student.objects.filter(school_class__in=school_classes)
+            if school_classes.count() == 1:
+                form.base_fields['school_class'].initial = school_classes.first()
+                form.base_fields['school_class'].disabled = True
+            # Only show the logged-in teacher in marked_by and make it read-only
+            if 'marked_by' in form.base_fields:
+                form.base_fields['marked_by'].queryset = Teacher.objects.filter(pk=request.user.teacher_profile.pk)
+                form.base_fields['marked_by'].initial = request.user.teacher_profile
+                form.base_fields['marked_by'].disabled = True
         return form
 
     def save_model(self, request, obj, form, change):
-        # Set marked_by to the logged-in teacher
         if hasattr(request.user, 'teacher_profile'):
-            obj.marked_by = request.user.teacher_profile
-            obj.school_class = request.user.teacher_profile.class_teacher_of
+            school_classes = SchoolClass.objects.filter(class_teacher=request.user.teacher_profile)
+            if school_classes.count() == 1:
+                obj.school_class = school_classes.first()
+            obj.marked_by = request.user.teacher_profile  # Always set to logged-in teacher
         super().save_model(request, obj, form, change)
 
     def mark_present(self, request, queryset):
@@ -699,4 +638,149 @@ class AttendanceAdmin(admin.ModelAdmin):
         self.request = request  # So the method above can access GET params
         return super().change_view(request, object_id, form_url, extra_context)
 
+    def get_list_filter(self, request):
+        # Remove class filter for teachers
+        if hasattr(request.user, 'teacher_profile'):
+            return ('date', 'status')
+        return super().get_list_filter(request)
+
+    def mark_all_present_today(self, request, queryset):
+        today = timezone.now().date()
+        for school_class in SchoolClass.objects.filter(class_teacher=request.user.teacher_profile):
+            students = Student.objects.filter(school_class=school_class)
+            for student in students:
+                obj, created = Attendance.objects.get_or_create(
+                    student=student,
+                    school_class=school_class,
+                    date=today,
+                    defaults={'status': 'present', 'marked_by': request.user.teacher_profile}
+                )
+                if not created:
+                    obj.status = 'present'
+                    obj.marked_by = request.user.teacher_profile
+                    obj.save()
+        self.message_user(request, "All students marked present for today.")
+
+    mark_all_present_today.short_description = "Mark all my students present for today"
+
+    def changelist_view(self, request, extra_context=None):
+        # Pre-populate attendance for all students in the teacher's class for today
+        if hasattr(request.user, 'teacher_profile'):
+            today = timezone.now().date()
+            school_classes = SchoolClass.objects.filter(class_teacher=request.user.teacher_profile)
+            for school_class in school_classes:
+                students = Student.objects.filter(school_class=school_class)
+                for student in students:
+                    Attendance.objects.get_or_create(
+                        student=student,
+                        school_class=school_class,
+                        date=today,
+                        defaults={'status': 'Absent', 'marked_by': request.user.teacher_profile}
+                    )
+        return super().changelist_view(request, extra_context)
+
+    def has_add_permission(self, request):
+        # Only allow class teachers and superusers to add attendance
+        if request.user.is_superuser:
+            return True
+        if hasattr(request.user, 'teacher_profile'):
+            return SchoolClass.objects.filter(class_teacher=request.user.teacher_profile).exists()
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        # Only allow class teachers to change attendance for their own class
+        if request.user.is_superuser:
+            return True
+        if hasattr(request.user, 'teacher_profile'):
+            if obj is None:
+                # Allow access to the change list
+                return True
+            # Only allow if the teacher is the class teacher for this attendance's class
+            return obj.school_class.class_teacher == request.user.teacher_profile
+        return False
+
+    def get_actions(self, request):
+        """
+        Only allow bulk actions for class teachers and superusers.
+        Other teachers can view but not use actions.
+        """
+        actions = super().get_actions(request)
+        if request.user.is_superuser:
+            return actions
+        if hasattr(request.user, 'teacher_profile'):
+            # Only allow actions if the teacher is a class teacher of any class
+            if SchoolClass.objects.filter(class_teacher=request.user.teacher_profile).exists():
+                return actions
+        # Remove all actions for non-class teachers
+        return {}
+
 admin.site.register(Attendance, AttendanceAdmin)
+
+class StudentDiaryAdmin(admin.ModelAdmin):
+    list_display = ('student', 'teacher', 'date', 'title')
+    search_fields = ('student__name', 'title', 'entry')
+    list_filter = ('date', 'teacher', 'student')
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        if hasattr(request.user, 'teacher_profile'):
+            # Teacher: show diaries for students in classes where the teacher is an expert in at least one subject
+            expert_classes = SchoolClass.objects.filter(subjects__in=request.user.teacher_profile.subject_expert.all()).distinct()
+            return qs.filter(student__school_class__in=expert_classes)
+        if hasattr(request.user, 'student_profile'):
+            # Student: show only their own diary entries
+            return qs.filter(student=request.user.student_profile)
+        return qs.none()
+
+    def has_add_permission(self, request):
+        # Only teachers and superusers can add
+        return request.user.is_superuser or hasattr(request.user, 'teacher_profile')
+
+    def has_change_permission(self, request, obj=None):
+        # Only the teacher who wrote it or superuser can change
+        if request.user.is_superuser:
+            return True
+        if hasattr(request.user, 'teacher_profile'):
+            if obj is None:
+                return True
+            return obj.teacher == request.user.teacher_profile
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        # Only the teacher who wrote it or superuser can delete
+        if request.user.is_superuser:
+            return True
+        if hasattr(request.user, 'teacher_profile'):
+            if obj is None:
+                return True
+            return obj.teacher == request.user.teacher_profile
+        return False
+
+    def get_readonly_fields(self, request, obj=None):
+        # Students: all fields readonly
+        if hasattr(request.user, 'student_profile'):
+            return [f.name for f in self.model._meta.fields]
+        return super().get_readonly_fields(request, obj)
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        # Teachers: limit students to classes where they teach at least one subject
+        if db_field.name == "student" and hasattr(request.user, 'teacher_profile'):
+            # Find all classes where the teacher is an expert in at least one subject
+            expert_classes = SchoolClass.objects.filter(
+                subjects__in=request.user.teacher_profile.subject_expert.all()
+            ).distinct()
+            kwargs["queryset"] = Student.objects.filter(school_class__in=expert_classes)
+        # Teachers: only themselves in teacher field
+        if db_field.name == "teacher" and hasattr(request.user, 'teacher_profile'):
+            kwargs["queryset"] = Teacher.objects.filter(pk=request.user.teacher_profile.pk)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def save_model(self, request, obj, form, change):
+        # Always set teacher to the logged-in teacher
+        if hasattr(request.user, 'teacher_profile'):
+            obj.teacher = request.user.teacher_profile
+        super().save_model(request, obj, form, change)
+
+admin.site.register(StudentDiary, StudentDiaryAdmin)
