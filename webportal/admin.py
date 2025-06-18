@@ -169,7 +169,7 @@ class HomeworkAdmin(admin.ModelAdmin):
         return ['created_at', 'updated_at'] + list(super().get_readonly_fields(request, obj))
 
     def html_description(self, obj):
-        # Responsive CSS for description, but keep HTML tags (including images)
+        # Responsive CSS for description, including images and text wrapping
         return mark_safe(f"""
             <style>
             .responsive-description {{
@@ -180,6 +180,12 @@ class HomeworkAdmin(admin.ModelAdmin):
                 background: #f8f9fa;
                 border-radius: 4px;
                 margin-bottom: 8px;
+                overflow-x: auto;
+            }}
+            .responsive-description img {{
+                max-width: 100%;
+                height: auto;
+                display: block;
             }}
             @media (max-width: 600px) {{
                 .responsive-description {{
