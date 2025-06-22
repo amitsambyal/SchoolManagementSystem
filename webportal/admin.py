@@ -163,6 +163,11 @@ class HomeworkAdmin(admin.ModelAdmin):
     list_filter = (('subject', CustomSubjectListFilter), ('teacher', CustomTeacherListFilter), 'assigned_date', 'due_date')
     search_fields = ('description',)  # Removed 'title'
 
+    class Media:
+        css = {
+            'all': ('admin/css/list_responsive.css',)
+        }
+
     def get_readonly_fields(self, request, obj=None):
         if hasattr(request.user, 'student_profile'):
             return ['subject', 'teacher', 'assigned_date', 'due_date', 'html_description', 'created_at', 'updated_at']
@@ -329,7 +334,7 @@ admin.site.register(Teacher, TeacherAdmin)
 
 
 class SyllabusAdmin(admin.ModelAdmin):
-    list_display = ('title', 'subject', 'teacher', 'created_at', 'updated_at')
+    list_display = ('title', 'subject', 'teacher')
     list_filter = (('subject', CustomSubjectListFilter), ('teacher', CustomTeacherListFilter))
     search_fields = ('title', 'content')
 
@@ -647,7 +652,7 @@ class AttendanceAdmin(admin.ModelAdmin):
     def get_list_filter(self, request):
         # Remove class filter for teachers
         if hasattr(request.user, 'teacher_profile'):
-            return ('date', 'status')
+            return ('date', 'student')
         return super().get_list_filter(request)
 
     def mark_all_present_today(self, request, queryset):
@@ -732,9 +737,12 @@ class StudentDiaryAdmin(admin.ModelAdmin):
         if request.user.is_superuser:
             return qs
         if hasattr(request.user, 'teacher_profile'):
-            # Teacher: show diaries for students in classes where the teacher is an expert in at least one subject
+           # Only diaries added by this teacher, for students in classes where they are subject expert
             expert_classes = SchoolClass.objects.filter(subjects__in=request.user.teacher_profile.subject_expert.all()).distinct()
-            return qs.filter(student__school_class__in=expert_classes)
+            return qs.filter(
+                teacher=request.user.teacher_profile,
+                student__school_class__in=expert_classes
+            )
         if hasattr(request.user, 'student_profile'):
             # Student: show only their own diary entries
             return qs.filter(student=request.user.student_profile)
@@ -765,9 +773,10 @@ class StudentDiaryAdmin(admin.ModelAdmin):
         return False
 
     def get_readonly_fields(self, request, obj=None):
-        # Students: all fields readonly
+        # Students: all fields readonly except 'id' and 'updated_at'
         if hasattr(request.user, 'student_profile'):
-            return [f.name for f in self.model._meta.fields]
+            readonly = [f.name for f in self.model._meta.fields if f.name not in ('id', 'created_at')]
+            return readonly
         return super().get_readonly_fields(request, obj)
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
@@ -788,5 +797,51 @@ class StudentDiaryAdmin(admin.ModelAdmin):
         if hasattr(request.user, 'teacher_profile'):
             obj.teacher = request.user.teacher_profile
         super().save_model(request, obj, form, change)
+    
+    def get_list_filter(self, request):              
+        # For students, show only relevant teachers in the filter
+        if hasattr(request.user, 'student_profile'):
+             return ('date', RelevantTeacherListFilter)
+        elif hasattr(request.user, 'teacher_profile'):
+        # For teachers, show only date and student filters (remove teacher filter)
+            return ('date', RelevantStudentListFilter)
+        return super().get_list_filter(request)  
 
 admin.site.register(StudentDiary, StudentDiaryAdmin)
+
+from django.contrib.admin import SimpleListFilter
+
+class RelevantTeacherListFilter(SimpleListFilter):
+    title = 'teacher'
+    parameter_name = 'teacher'
+
+    def lookups(self, request, model_admin):
+        if hasattr(request.user, 'student_profile'):
+            student = request.user.student_profile
+            # Get teachers who teach subjects in the student's class
+            teachers = Teacher.objects.filter(subject_expert__school_class=student.school_class).distinct()
+            return [(t.pk, str(t)) for t in teachers]
+        return []
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(teacher__pk=self.value())
+        return queryset
+    
+class RelevantStudentListFilter(SimpleListFilter):
+    title = 'student'
+    parameter_name = 'student'
+
+    def lookups(self, request, model_admin):
+        if hasattr(request.user, 'teacher_profile'):
+            teacher = request.user.teacher_profile
+            expert_classes = SchoolClass.objects.filter(subjects__in=teacher.subject_expert.all()).distinct()
+            students = Student.objects.filter(school_class__in=expert_classes)
+            return [(s.pk, str(s)) for s in students]
+        return []
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(student__pk=self.value())
+        return queryset    
+
