@@ -17,6 +17,9 @@ from .forms import TimetableGenerationForm
 from django.forms.models import BaseInlineFormSet  # <-- Add this line
 from django.utils import timezone
 from django.contrib.admin.views.main import ChangeList
+import re
+from django.contrib.admin import SimpleListFilter
+from django.contrib.admin import DateFieldListFilter
 
 admin.site.site_header = "School Management System"
 admin.site.site_title = "School Admin Panel"
@@ -48,10 +51,15 @@ class StudentAdminForm(forms.ModelForm):
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
     form = StudentAdminForm
-    list_display = ('name', 'roll_no', 'phone_no', 'age_display', 'school_class', 'pen_number')
+    list_display = ( 'name','image_tag','roll_no','pen_number')
     readonly_fields = ('image_tag',)
     list_filter = ('school_class',)
     search_fields = ('name', 'roll_no')
+    
+    class Media:
+        css = {
+            'all': ('admin/css/list_responsive.css',)
+        }
    
     fieldsets = (
         ('Personal Information', {
@@ -67,13 +75,18 @@ class StudentAdmin(admin.ModelAdmin):
     
     def image_tag(self, obj):
         if obj.image:
-            return format_html('<img src="{}" width="100" height="100" style="border-radius:8px;margin-bottom:10px;" />', obj.image.url)
+            return format_html('<img src="{}" width="60" height="60" style="border-radius:8px;margin-bottom:4px;" />', obj.image.url)
         return "-"
     image_tag.short_description = 'Image'
 
     def age_display(self, obj):
         return obj.age
     age_display.short_description = 'Age'    
+    
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        extra_context['show_print_button'] = True
+        return super().changelist_view(request, extra_context=extra_context)
   
     def get_list_filter(self, request):
         # Remove class filter for teachers
@@ -158,6 +171,7 @@ class CustomTeacherListFilter(RelatedFieldListFilter):
         else:
             return super().field_choices(field, request, model_admin)        
 
+@admin.register(Homework)
 class HomeworkAdmin(admin.ModelAdmin):
     list_display = ('subject', 'html_description')
     list_filter = (('subject', CustomSubjectListFilter), ('teacher', CustomTeacherListFilter), 'assigned_date', 'due_date')
@@ -203,6 +217,7 @@ class HomeworkAdmin(admin.ModelAdmin):
         """)
     html_description.short_description = "Description"
 
+    
     def get_fields(self, request, obj=None):
         if hasattr(request.user, 'student_profile'):
             return ['subject', 'teacher', 'html_description', 'assigned_date', 'due_date']
@@ -293,8 +308,6 @@ class HomeworkAdmin(admin.ModelAdmin):
             return obj.teacher == request.user.teacher_profile
         return False
 
-admin.site.register(Homework, HomeworkAdmin)
-
 @admin.register(Subject)
 class SubjectAdmin(admin.ModelAdmin):
     list_display = ('name', 'school_class')
@@ -311,9 +324,21 @@ class UserAdmin(BaseUserAdmin):
 admin.site.unregister(User)  # Unregister the default User admin
 admin.site.register(User, UserAdmin)  # Register the custom User admin
 
+@admin.register(Teacher)    
 class TeacherAdmin(admin.ModelAdmin):
-    list_display = ('name', 'email', 'mobile')
+    list_display = ('name', 'mobile', 'image_tag',)
     filter_horizontal = ('subject_expert',)
+    
+    def image_tag(self, obj):
+        if obj.profile_picture:
+            return format_html('<img src="{}" width="60" height="60" style="border-radius:8px;margin-bottom:4px;" />', obj.profile_picture.url)
+        return "-"
+    image_tag.short_description = 'Image'
+    
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        extra_context['show_print_button'] = True
+        return super().changelist_view(request, extra_context=extra_context)
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -329,10 +354,7 @@ class TeacherAdmin(admin.ModelAdmin):
             return ('subject_expert',)
         return super().get_list_filter(request)
 
-admin.site.register(Teacher, TeacherAdmin)
-
-
-
+@admin.register(Syllabus)   
 class SyllabusAdmin(admin.ModelAdmin):
     list_display = ('title', 'subject', 'teacher')
     list_filter = (('subject', CustomSubjectListFilter), ('teacher', CustomTeacherListFilter))
@@ -413,8 +435,6 @@ class SyllabusAdmin(admin.ModelAdmin):
                 return True
             return obj.teacher == request.user.teacher_profile
         return False
-
-admin.site.register(Syllabus, SyllabusAdmin)
 
 @admin.register(Timetable)
 class TimetableAdmin(admin.ModelAdmin):
@@ -594,12 +614,18 @@ class AttendanceInlineFormSet(BaseInlineFormSet):
             return qs.filter(student__school_class=school_class)
         return qs
 
+@admin.register(Attendance)
 class AttendanceAdmin(admin.ModelAdmin):
     list_display = ('student', 'school_class', 'date', 'status', 'marked_by', 'marked_at')
-    list_filter = ('school_class', 'date', 'status')
+    list_filter = (
+        'school_class',
+        ('date', DateFieldListFilter),  # This enables the calendar widget
+        'status',
+    )
     search_fields = ('student__name', 'school_class__class_name')
     actions = ['mark_present', 'mark_absent', 'mark_leave', 'mark_all_present_today']
-
+    
+       
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         if request.user.is_superuser:
@@ -609,7 +635,7 @@ class AttendanceAdmin(admin.ModelAdmin):
             expert_classes = SchoolClass.objects.filter(subjects__in=request.user.teacher_profile.subject_expert.all()).distinct()
             return qs.filter(school_class__in=expert_classes)
         return qs.none()
-
+    
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
         if hasattr(request.user, 'teacher_profile'):
@@ -650,9 +676,13 @@ class AttendanceAdmin(admin.ModelAdmin):
         return super().change_view(request, object_id, form_url, extra_context)
 
     def get_list_filter(self, request):
-        # Remove class filter for teachers
+        from django.contrib.admin import DateFieldListFilter
         if hasattr(request.user, 'teacher_profile'):
-            return ('date', 'student')
+            return (
+                'student',
+                ('date', DateFieldListFilter),
+                'status',
+            )
         return super().get_list_filter(request)
 
     def mark_all_present_today(self, request, queryset):
@@ -724,9 +754,13 @@ class AttendanceAdmin(admin.ModelAdmin):
                 return actions
         # Remove all actions for non-class teachers
         return {}
+    
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        extra_context['show_print_button'] = True
+        return super().changelist_view(request, extra_context=extra_context)
 
-admin.site.register(Attendance, AttendanceAdmin)
-
+@admin.register(StudentDiary)
 class StudentDiaryAdmin(admin.ModelAdmin):
     list_display = ('student', 'teacher', 'date', 'title')
     search_fields = ('student__name', 'title', 'entry')
@@ -807,10 +841,6 @@ class StudentDiaryAdmin(admin.ModelAdmin):
             return ('date', RelevantStudentListFilter)
         return super().get_list_filter(request)  
 
-admin.site.register(StudentDiary, StudentDiaryAdmin)
-
-from django.contrib.admin import SimpleListFilter
-
 class RelevantTeacherListFilter(SimpleListFilter):
     title = 'teacher'
     parameter_name = 'teacher'
@@ -843,5 +873,5 @@ class RelevantStudentListFilter(SimpleListFilter):
     def queryset(self, request, queryset):
         if self.value():
             return queryset.filter(student__pk=self.value())
-        return queryset    
+        return queryset
 

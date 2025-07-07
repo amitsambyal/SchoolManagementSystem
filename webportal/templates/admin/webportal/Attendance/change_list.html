@@ -1,0 +1,78 @@
+{% extends "admin/change_list.html" %}
+
+{% block extrahead %}
+    {{ block.super }}
+    <style>
+    @media print {
+        /* Hide checkbox column header and cells in print */
+        th.action-checkbox-column,
+        td.action-checkbox-column,
+        input.action-select,
+        input[type="checkbox"][name="_selected_action"],
+        input[type="checkbox"][id="action-toggle"] {
+            display: none !important;
+        }
+        /* Hide Django admin UI elements */
+        .breadcrumbs,
+        .object-tools,
+        .paginator,
+        .actions,
+        .search-container,
+        .filters,
+        .sidebar,
+        .nav-sidebar,
+        header,
+        footer,
+        #header,
+        #user-tools,
+        #nav-sidebar,
+        #footer,
+        .module caption,
+        .module .addlink,
+        .module .changelink,
+        .module .deletelink,
+        .change-list .actions,
+        .change-list .paginator,
+        .change-list .search-container,
+        .change-list .filters {
+            display: none !important;
+        }
+        /* Make the table fill the page */
+        #result_list {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100vw !important;
+            background: #fff !important;
+            box-shadow: none !important;
+            padding: 20px !important;
+            border: none !important;
+            z-index: 99999 !important;
+        }
+        #result_list {
+            display: table !important;
+            width: 100vw !important;
+            table-layout: auto !important;
+        }
+        #result_list thead {
+            display: table-header-group !important;
+        }
+        #result_list tbody {
+            display: table-row-group !important;
+        }
+        #result_list tr {
+            display: table-row !important;
+        }
+        #result_list th, #result_list td {
+            display: table-cell !important;
+        }
+    }
+    </style>
+{% endblock %}
+
+{% block object-tools %}
+    {{ block.super }}
+    {% if show_print_button %}
+    <button onclick="window.print()" class="button" style="margin-left:10px;">🖨️ Print</button>
+    {% endif %}
+{% endblock %}
