@@ -460,6 +460,7 @@ class TimetableAdmin(admin.ModelAdmin):
 class SchoolClassAdmin(admin.ModelAdmin):
     list_display = ('class_name', 'view_timetable_link')
     actions = ['generate_timetable_action']
+ 
 
     def get_urls(self):
         urls = super().get_urls()
@@ -622,6 +623,7 @@ class AttendanceAdmin(admin.ModelAdmin):
         ('date', DateFieldListFilter),  # This enables the calendar widget
         'status',
     )
+
     search_fields = ('student__name', 'school_class__class_name')
     actions = ['mark_present', 'mark_absent', 'mark_leave', 'mark_all_present_today']
     
