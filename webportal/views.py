@@ -63,6 +63,10 @@ def contact(request):
 def privacy_policy(request):
     return render(request, 'webportal/privacy-policy.html')
 
+def delete_account_request(request):
+    return render(request, 'webportal/delete-account-request.html')
+
+
 def syllabus(request):
     schoolclass = SchoolClass.objects.prefetch_related('subjects').all()
     return render(request, 'webportal/syllabus.html', {'schoolclass': schoolclass})
