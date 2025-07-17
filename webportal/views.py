@@ -60,6 +60,9 @@ def about(request):
 def contact(request):
     return render(request, 'webportal/contact.html')
 
+def privacy_policy(request):
+    return render(request, 'webportal/privacy-policy.html')
+
 def syllabus(request):
     schoolclass = SchoolClass.objects.prefetch_related('subjects').all()
     return render(request, 'webportal/syllabus.html', {'schoolclass': schoolclass})
