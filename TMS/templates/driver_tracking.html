@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Driver GPS Tracking</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 2s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+        <div class="text-center mb-6">
+            <h1 class="text-2xl font-bold text-blue-600">School Transport GPS</h1>
+            <p class="text-gray-500">Driver Location Tracker</p>
+        </div>
+        
+        <div class="mb-4">
+            <label for="vehicle_number" class="block text-sm font-medium text-gray-700 mb-1">Vehicle Number</label>
+            <select id="vehicle_number" class="w-full px-4 py-2 border border-gray-300 rounded-md">
+                {% for vehicle in vehicles %}
+                <option value="{{ vehicle.number }}">{{ vehicle.number }} ({{ vehicle.driver }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="bg-blue-50 p-4 rounded-md mb-6 text-center">
+            <div id="status-container">
+                <p id="status-text" class="font-medium">Click Start Tracking to begin</p>
+                <div id="loading-spinner" class="loading-spinner hidden"></div>
+            </div>
+            
+            <div id="location-display" class="mt-2 hidden">
+                <p class="text-sm">Latitude: <span id="latitude" class="font-mono">-</span></p>
+                <p class="text-sm">Longitude: <span id="longitude" class="font-mono">-</span></p>
+                <p class="text-sm">Last Update: <span id="last-update" class="font-mono">-</span></p>
+            </div>
+        </div>
+        
+        <div class="flex gap-3">
+            <button id="start-btn" 
+                    class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition">
+                Start Tracking
+            </button>
+            <button id="stop-btn" 
+                    class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-md transition disabled:opacity-50" 
+                    disabled>
+                Stop Tracking
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let watchId = null;
+        let updateInterval = null;
+        const apiEndpoint = '/api/update-location/';
+        
+        // DOM Elements
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const statusText = document.getElementById('status-text');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const locationDisplay = document.getElementById('location-display');
+        const latitudeDisplay = document.getElementById('latitude');
+        const longitudeDisplay = document.getElementById('longitude');
+        const lastUpdateDisplay = document.getElementById('last-update');
+        const vehicleSelect = document.getElementById('vehicle_number');
+        
+        // Start tracking function
+        function startTracking() {
+            statusText.textContent = 'Getting location...';
+            loadingSpinner.classList.remove('hidden');
+            
+            // Enable GPS tracking
+            if (navigator.geolocation) {
+                watchId = navigator.geolocation.watchPosition(
+                    position => {
+                        const latitude = position.coords.latitude;
+                        const longitude = position.coords.longitude;
+                        
+                        // Display location info
+                        latitudeDisplay.textContent = latitude;
+                        longitudeDisplay.textContent = longitude;
+                        lastUpdateDisplay.textContent = new Date().toLocaleTimeString();
+                        locationDisplay.classList.remove('hidden');
+                        
+                        // Send to server every 30 seconds
+                        if (!updateInterval) {
+                            sendLocation(latitude, longitude);
+                            updateInterval = setInterval(() => {
+                                sendLocation(latitude, longitude);
+                            }, 30000);
+                        }
+                        
+                        statusText.textContent = 'Tracking active';
+                    },
+                    error => {
+                        let errorMessage = '';
+                        switch(error.code) {
+                            case error.PERMISSION_DENIED:
+                                errorMessage = 'Location access was denied';
+                                break;
+                            case error.POSITION_UNAVAILABLE:
+                                errorMessage = 'Location information unavailable';
+                                break;
+                            case error.TIMEOUT:
+                                errorMessage = 'Request timed out';
+                                break;
+                            default:
+                                errorMessage = 'Unknown error occurred';
+                        }
+                        statusText.textContent = errorMessage;
+                        stopTracking();
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        maximumAge: 0,
+                        timeout: 5000
+                    }
+                );
+                
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+            } else {
+                statusText.textContent = 'Geolocation is not supported by this browser.';
+                loadingSpinner.classList.add('hidden');
+            }
+        }
+        
+        // Stop tracking function
+        function stopTracking() {
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+            
+            if (updateInterval) {
+                clearInterval(updateInterval);
+                updateInterval = null;
+            }
+            
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            statusText.textContent = 'Tracking stopped';
+            loadingSpinner.classList.add('hidden');
+        }
+        
+        // Send location to server
+        function sendLocation(latitude, longitude) {
+            const vehicleNumber = vehicleSelect.value;
+            
+            fetch(apiEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+                body: JSON.stringify({
+                    vehicle_number: vehicleNumber,
+                    latitude: latitude,
+                    longitude: longitude
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                lastUpdateDisplay.textContent = new Date().toLocaleTimeString();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                statusText.textContent = 'Failed to update server. Trying again...';
+            });
+        }
+        
+        // Helper function to get CSRF token
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+        
+        // Event listeners
+        startBtn.addEventListener('click', startTracking);
+        stopBtn.addEventListener('click', stopTracking);
+    </script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+<form method="post">
+    {% csrf_token %}
+    <label for="bus_number">Enter Bus Number:</label>
+    <input type="text" id="bus_number" name="bus_number" required>
+    <button type="submit">Track</button>
+</form>
+
+{% if vehicle %}
+    <h2>Tracking {{ vehicle.number }}</h2>
+    {% if latest_update %}
+        <p>Current Location: {{ latest_update.latitude }}, {{ latest_update.longitude }}</p>
+        <p>Last Updated: {{ latest_update.timestamp }}</p>
+    {% else %}
+        <p>No location updates available.</p>
+    {% endif %}
+{% endif %}
+
+{% if error %}
+    <p style="color: red;">{{ error }}</p>
+{% endif %}

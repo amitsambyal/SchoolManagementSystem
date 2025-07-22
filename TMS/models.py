@@ -15,6 +15,8 @@ class Vehicle(models.Model):
     capacity = models.PositiveIntegerField()
     remarks = models.TextField(blank=True)
     driver = models.ForeignKey('TMS.Driver', on_delete=models.SET_NULL, null=True, blank=True)
+    current_latitude = models.FloatField(null=True, blank=True)
+    current_longitude = models.FloatField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.number} ({self.driver})" if hasattr(self, 'number') else str(self.pk)
@@ -81,4 +83,12 @@ class Driver(models.Model):
 
     def __str__(self):
         return self.name
-
+    
+    
+class LocationUpdate(models.Model):
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE)
+    latitude = models.FloatField()
+    longitude = models.FloatField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+    def __str__(self):
+        return f"{self.vehicle} - {self.timestamp}"
