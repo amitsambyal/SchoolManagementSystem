@@ -178,6 +178,7 @@ class HomeworkAdmin(admin.ModelAdmin):
     search_fields = ('description',)  # Removed 'title'
 
     class Media:
+        js = ('admin/js/admin-table-responsive.js',)
         css = {
             'all': ('admin/css/list_responsive.css',)
         }
