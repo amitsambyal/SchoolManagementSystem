@@ -173,12 +173,11 @@ class CustomTeacherListFilter(RelatedFieldListFilter):
 
 @admin.register(Homework)
 class HomeworkAdmin(admin.ModelAdmin):
-    list_display = ('subject', 'html_description')
+    list_display = ('responsive_subject', 'html_description')
     list_filter = (('subject', CustomSubjectListFilter), ('teacher', CustomTeacherListFilter), 'assigned_date', 'due_date')
-    search_fields = ('description',)  # Removed 'title'
+    search_fields = ('description',)
 
     class Media:
-        js = ('admin/js/admin-table-responsive.js',)
         css = {
             'all': ('admin/css/list_responsive.css',)
         }
@@ -188,35 +187,17 @@ class HomeworkAdmin(admin.ModelAdmin):
             return ['subject', 'teacher', 'assigned_date', 'due_date', 'html_description', 'created_at', 'updated_at']
         return ['created_at', 'updated_at'] + list(super().get_readonly_fields(request, obj))
 
+    def responsive_subject(self, obj):
+        return mark_safe(f'<div class="responsive-subject" data-label="Subject">{obj.subject}</div>')
+    responsive_subject.short_description = 'Subject'
+    responsive_subject.admin_order_field = 'subject'
+
     def html_description(self, obj):
-        # Responsive CSS for description, including images and text wrapping
-        return mark_safe(f"""
-            <style>
-            .responsive-description {{
-                word-break: break-word;
-                max-width: 100%;
-                box-sizing: border-box;
-                padding: 8px;
-                background: #f8f9fa;
-                border-radius: 4px;
-                margin-bottom: 8px;
-                overflow-x: auto;
-            }}
-            .responsive-description img {{
-                max-width: 100%;
-                height: auto;
-                display: block;
-            }}
-            @media (max-width: 600px) {{
-                .responsive-description {{
-                    font-size: 0.97em;
-                    padding: 5px;
-                }}
-            }}
-            </style>
-            <div class="responsive-description">{obj.description}</div>
-        """)
-    html_description.short_description = "Description"
+        short_desc = strip_tags(obj.description)
+        if len(short_desc) > 150:
+            short_desc = short_desc[:150] + '...'
+        return mark_safe(f'<div class="responsive-description" data-label="Description">{short_desc}</div>')
+    html_description.short_description = 'Description'
 
     
     def get_fields(self, request, obj=None):
@@ -357,9 +338,20 @@ class TeacherAdmin(admin.ModelAdmin):
 
 @admin.register(Syllabus)   
 class SyllabusAdmin(admin.ModelAdmin):
-    list_display = ('title', 'subject', 'teacher')
+    list_display = ('responsive_title', 'responsive_subject', 'teacher')
     list_filter = (('subject', CustomSubjectListFilter), ('teacher', CustomTeacherListFilter))
     search_fields = ('title', 'content')
+
+    def responsive_title(self, obj):
+        # Using strip_tags to avoid complex HTML in list view.
+        return mark_safe(f'<div class="responsive-title" data-label="Title">{strip_tags(obj.title)}</div>')
+    responsive_title.short_description = "Title"
+    responsive_title.admin_order_field = 'title'
+
+    def responsive_subject(self, obj):
+        return mark_safe(f'<div class="responsive-subject" data-label="Subject">{obj.subject}</div>')
+    responsive_subject.short_description = "Subject"
+    responsive_subject.admin_order_field = 'subject'
 
     def get_readonly_fields(self, request, obj=None):
         # For students, make all fields readonly and show html_content instead of content
@@ -877,4 +869,3 @@ class RelevantStudentListFilter(SimpleListFilter):
         if self.value():
             return queryset.filter(student__pk=self.value())
         return queryset
-
