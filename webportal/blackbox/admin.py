@@ -192,8 +192,11 @@ class HomeworkAdmin(admin.ModelAdmin):
     responsive_subject.short_description = 'Subject'
     responsive_subject.admin_order_field = 'subject'
 
-    def html_description(self, obj):              
-        return mark_safe(f'<div class="responsive-description" data-label="Description">{obj.description}</div>')
+    def html_description(self, obj):
+        short_desc = strip_tags(obj.description)
+        if len(short_desc) > 150:
+            short_desc = short_desc[:150] + '...'
+        return mark_safe(f'<div class="responsive-description" data-label="Description">{short_desc}</div>')
     html_description.short_description = 'Description'
 
     

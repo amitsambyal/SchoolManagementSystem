@@ -1,5 +1,19 @@
+
+
+/* Responsive: Hide description on very small screens */
+@media (max-width: 600px) {
+    th.column-description, td.field-description {
+        display: none;
+    }
+    th.column-subject, td.field-subject {
+        max-width: 120px;
+    }
+}
+
 .change-list #result_list .responsive-description,
-.change-list #result_list .responsive-title {
+.change-list #result_list .responsive-subject {
+    white-space: normal;
+    word-wrap: break-word;
     color: var(--description-text);
     font-size: clamp(0.8rem, 1.4vw, 0.95rem);
     line-height: 1.5;
@@ -9,38 +23,3 @@
         margin-right: auto;
         margin-bottom: 0.5rem;
 }
-/* Mobile-specific adjustments */
-@media (max-width: 768px) {
-    .change-list #result_list th,
-    .change-list #result_list td {
-        /*display: block;*/
-        width: 60%;
-        padding: 0.5rem;
-    }
-    
-    .change-list #result_list tr {
-        display: block;
-        margin-bottom: 1rem;
-    }
-    
-    .change-list #result_list thead {
-        display: none;
-    }
-    
-    /* Add data-label attributes for mobile view */
-    .change-list #result_list .responsive-subject,
-    .change-list #result_list .responsive-description,
-    .change-list #result_list .responsive-title {
-       
-        white-space: normal;
-    }
-
-    .change-list #result_list .responsive-subject::before,
-    .change-list #result_list .responsive-description::before {
-        content: attr(data-label);
-        display: block;
-        font-weight: bold;
-        margin-right: auto;
-        margin-bottom: 0.5rem;
-    }
-    }
