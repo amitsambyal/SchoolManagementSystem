@@ -9,6 +9,7 @@ from django_ckeditor_5.fields import CKEditor5Field
 import random
 import string
 from django.utils.timezone import now
+import logging
 
 # Create your models here.
 class favicon(models.Model):
@@ -236,17 +237,22 @@ class Student(models.Model):
         super().save(*args, **kwargs)
         if creating:
             self.create_user_account()
-
+            
+   
     def create_user_account(self):
         if not self.user:
             username = self.pen_number
             password = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
-            user = User.objects.create_user(username=username, email=self.email, password=password)
-            self.user = user
-            self.save()
+            try:
+                user = User.objects.create_user(username=username, email=self.email, password=password)
+                self.user = user
+                self.save()
             # Here you might want to send an email to the teacher with their login credentials
-            print(f"User account created for {self.name}. Username: {username}, Password: {password}")
-            
+                print(f"User account created for {self.name}. Username: {username}, Password: {password}")
+                logging.getLogger(__name__).info(f"User  account created for {self.name}. Username: {username}, Password: {password}")
+            except Exception as e:
+                logging.getLogger(__name__).error(f"Error creating user account for {self.name}: {e}")
+                raise
     @property
     def age(self):
         if self.date_of_birth:
