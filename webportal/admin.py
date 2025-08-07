@@ -610,24 +610,21 @@ class AttendanceAdmin(admin.ModelAdmin):
     list_display = ('student', 'school_class', 'date', 'status', 'marked_by', 'marked_at')
     list_filter = (
         'school_class',
-        ('date', DateFieldListFilter),  # This enables the calendar widget
+        ('date', DateFieldListFilter),
         'status',
     )
-
     search_fields = ('student__name', 'school_class__class_name')
     actions = ['mark_present', 'mark_absent', 'mark_leave', 'mark_all_present_today']
-    
-       
+
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         if request.user.is_superuser:
             return qs
         if hasattr(request.user, 'teacher_profile'):
-            # Allow teacher to view attendance for all classes where they are a subject expert
-            expert_classes = SchoolClass.objects.filter(subjects__in=request.user.teacher_profile.subject_expert.all()).distinct()
-            return qs.filter(school_class__in=expert_classes)
+            # Only allow class teacher to view attendance for their class
+            return qs.filter(school_class__class_teacher=request.user.teacher_profile)
         return qs.none()
-    
+
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
         if hasattr(request.user, 'teacher_profile'):
@@ -636,7 +633,6 @@ class AttendanceAdmin(admin.ModelAdmin):
             if school_classes.count() == 1:
                 form.base_fields['school_class'].initial = school_classes.first()
                 form.base_fields['school_class'].disabled = True
-            # Only show the logged-in teacher in marked_by and make it read-only
             if 'marked_by' in form.base_fields:
                 form.base_fields['marked_by'].queryset = Teacher.objects.filter(pk=request.user.teacher_profile.pk)
                 form.base_fields['marked_by'].initial = request.user.teacher_profile
@@ -648,34 +644,51 @@ class AttendanceAdmin(admin.ModelAdmin):
             school_classes = SchoolClass.objects.filter(class_teacher=request.user.teacher_profile)
             if school_classes.count() == 1:
                 obj.school_class = school_classes.first()
-            obj.marked_by = request.user.teacher_profile  # Always set to logged-in teacher
+            obj.marked_by = request.user.teacher_profile
         super().save_model(request, obj, form, change)
 
-    def mark_present(self, request, queryset):
-        queryset.update(status='present')
-    mark_present.short_description = "Mark selected as Present"
-
-    def mark_absent(self, request, queryset):
-        queryset.update(status='absent')
-    mark_absent.short_description = "Mark selected as Absent"
-
-    def mark_leave(self, request, queryset):
-        queryset.update(status='leave')
-    mark_leave.short_description = "Mark selected as Leave"
-
-    def change_view(self, request, object_id, form_url='', extra_context=None):
-        self.request = request  # So the method above can access GET params
-        return super().change_view(request, object_id, form_url, extra_context)
-
-    def get_list_filter(self, request):
-        from django.contrib.admin import DateFieldListFilter
+    def changelist_view(self, request, extra_context=None):
+        # Only class teachers can pre-populate attendance
         if hasattr(request.user, 'teacher_profile'):
-            return (
-                'student',
-                ('date', DateFieldListFilter),
-                'status',
-            )
-        return super().get_list_filter(request)
+            today = timezone.now().date()
+            school_classes = SchoolClass.objects.filter(class_teacher=request.user.teacher_profile)
+            for school_class in school_classes:
+                students = Student.objects.filter(school_class=school_class)
+                for student in students:
+                    Attendance.objects.get_or_create(
+                        student=student,
+                        school_class=school_class,
+                        date=today,
+                        defaults={'status': 'Absent', 'marked_by': request.user.teacher_profile}
+                    )
+        return super().changelist_view(request, extra_context)
+
+    def has_add_permission(self, request):
+        # Only allow class teachers and superusers to add attendance
+        if request.user.is_superuser:
+            return True
+        if hasattr(request.user, 'teacher_profile'):
+            return SchoolClass.objects.filter(class_teacher=request.user.teacher_profile).exists()
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        # Only allow class teachers to change attendance for their own class
+        if request.user.is_superuser:
+            return True
+        if hasattr(request.user, 'teacher_profile'):
+            if obj is None:
+                return True
+            return obj.school_class.class_teacher == request.user.teacher_profile
+        return False
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        if request.user.is_superuser:
+            return actions
+        if hasattr(request.user, 'teacher_profile'):
+            if SchoolClass.objects.filter(class_teacher=request.user.teacher_profile).exists():
+                return actions
+        return {}
 
     def mark_all_present_today(self, request, queryset):
         today = timezone.now().date()
@@ -710,46 +723,6 @@ class AttendanceAdmin(admin.ModelAdmin):
                         date=today,
                         defaults={'status': 'Absent', 'marked_by': request.user.teacher_profile}
                     )
-        return super().changelist_view(request, extra_context)
-
-    def has_add_permission(self, request):
-        # Only allow class teachers and superusers to add attendance
-        if request.user.is_superuser:
-            return True
-        if hasattr(request.user, 'teacher_profile'):
-            return SchoolClass.objects.filter(class_teacher=request.user.teacher_profile).exists()
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        # Only allow class teachers to change attendance for their own class
-        if request.user.is_superuser:
-            return True
-        if hasattr(request.user, 'teacher_profile'):
-            if obj is None:
-                # Allow access to the change list
-                return True
-            # Only allow if the teacher is the class teacher for this attendance's class
-            return obj.school_class.class_teacher == request.user.teacher_profile
-        return False
-
-    def get_actions(self, request):
-        """
-        Only allow bulk actions for class teachers and superusers.
-        Other teachers can view but not use actions.
-        """
-        actions = super().get_actions(request)
-        if request.user.is_superuser:
-            return actions
-        if hasattr(request.user, 'teacher_profile'):
-            # Only allow actions if the teacher is a class teacher of any class
-            if SchoolClass.objects.filter(class_teacher=request.user.teacher_profile).exists():
-                return actions
-        # Remove all actions for non-class teachers
-        return {}
-    
-    def changelist_view(self, request, extra_context=None):
-        extra_context = extra_context or {}
-        extra_context['show_print_button'] = True
         return super().changelist_view(request, extra_context=extra_context)
 
 @admin.register(StudentDiary)
