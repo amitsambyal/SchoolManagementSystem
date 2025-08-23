@@ -117,11 +117,16 @@ class Teacher(models.Model):
         if not self.user:
             username = self.email.split('@')[0]
             password = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
-            user = User.objects.create_user(username=username, email=self.email, password=password)
-            self.user = user
-            self.save()
-            # Here you might want to send an email to the teacher with their login credentials
-            print(f"User account created for {self.name}. Username: {username}, Password: {password}")
+            try:
+                user = User.objects.create_user(username=username, email=self.email, password=password)
+                self.user = user
+                self.save()
+                # Here you might want to send an email to the teacher with their login credentials
+                print(f"User account created for {self.name}. Username: {username}, Password: {password}")
+                logging.getLogger(__name__).info(f"User  account created for {self.name}. Username: {username}, Password: {password}")
+            except Exception as e:
+                logging.getLogger(__name__).error(f"Error creating user account for {self.name}: {e}")
+                raise
 
 @receiver(post_save, sender=Teacher)
 def update_user_account(sender, instance, created, **kwargs):
