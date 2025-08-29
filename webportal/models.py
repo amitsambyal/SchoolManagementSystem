@@ -114,19 +114,26 @@ class Teacher(models.Model):
             self.create_user_account()
 
     def create_user_account(self):
-        if not self.user:
-            username = self.email.split('@')[0]
+        if not self.user and self.email:
+            base_username = self.email.split('@')[0].strip().lower()
+            username = base_username
+
+            # Ensure uniqueness of username
+            counter = 1
+            while User.objects.filter(username=username).exists():
+                username = f"{base_username}_{counter}"
+                counter += 1
+
             password = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
             try:
                 user = User.objects.create_user(username=username, email=self.email, password=password)
-                self.user = user
-                self.save()
-                # Here you might want to send an email to the teacher with their login credentials
+                self.user = user  # Just assign, don’t call self.save()
                 print(f"User account created for {self.name}. Username: {username}, Password: {password}")
-                logging.getLogger(__name__).info(f"User  account created for {self.name}. Username: {username}, Password: {password}")
+                logging.getLogger(__name__).info(f"User account created for {self.name}. Username: {username}")
             except Exception as e:
-                logging.getLogger(__name__).error(f"Error creating user account for {self.name}: {e}")
+                logging.getLogger(__name__).error(f"Error creating user for {self.name}: {e}")
                 raise
+
 
 @receiver(post_save, sender=Teacher)
 def update_user_account(sender, instance, created, **kwargs):
@@ -245,18 +252,27 @@ class Student(models.Model):
             
    
     def create_user_account(self):
-        if not self.user:
-            username = self.pen_number
+        if not self.user and self.pen_number:
+            username = self.pen_number.strip()
+            if not username:
+                raise ValueError("PEN number is required to create a user.")
+            
+            # Check for uniqueness or add suffix
+            base_username = username
+            counter = 1
+            while User.objects.filter(username=username).exists():
+                username = f"{base_username}_{counter}"
+                counter += 1
+
             password = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
             try:
                 user = User.objects.create_user(username=username, email=self.email, password=password)
-                self.user = user
-                self.save()
-            # Here you might want to send an email to the teacher with their login credentials
+                self.user = user  # Just assign; don't save here
+                # Do NOT call self.save() here
                 print(f"User account created for {self.name}. Username: {username}, Password: {password}")
-                logging.getLogger(__name__).info(f"User  account created for {self.name}. Username: {username}, Password: {password}")
+                logging.getLogger(__name__).info(f"User account created for {self.name}. Username: {username}")
             except Exception as e:
-                logging.getLogger(__name__).error(f"Error creating user account for {self.name}: {e}")
+                logging.getLogger(__name__).error(f"Error creating user for {self.name}: {e}")
                 raise
     @property
     def age(self):

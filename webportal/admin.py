@@ -116,14 +116,19 @@ class StudentAdmin(admin.ModelAdmin):
         return form
 
     def save_model(self, request, obj, form, change):
-        # Always set the class to the teacher's class, regardless of submitted data
+        # Set the class for teachers
         if hasattr(request.user, 'teacher_profile'):
             school_class = SchoolClass.objects.filter(class_teacher=request.user.teacher_profile).first()
             if school_class:
                 obj.school_class = school_class
+
         super().save_model(request, obj, form, change)
-        if not change:
+
+        if not change and not obj.user:
             obj.create_user_account()
+            # Save again to update the `user` field
+            obj.save(update_fields=['user'])
+
 
     
     def get_queryset(self, request):
@@ -332,6 +337,15 @@ class TeacherAdmin(admin.ModelAdmin):
         if hasattr(request.user, 'student_profile'):
             return ('subject_expert',)
         return super().get_list_filter(request)
+    
+    def save_model(self, request, obj, form, change):
+        # Save the teacher first
+        super().save_model(request, obj, form, change)
+
+        # If new and user not assigned, create user and save again
+        if not change and not obj.user:
+            obj.create_user_account()
+            obj.save(update_fields=['user'])
 
 @admin.register(Syllabus)   
 class SyllabusAdmin(admin.ModelAdmin):
