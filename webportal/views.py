@@ -87,5 +87,3 @@ def get_subjects_by_class(request, class_id):
     subjects = school_class.subjects.all()
     subject_data = [{'id': subject.id, 'name': subject.name} for subject in subjects]
     return JsonResponse({'subjects': subject_data})
-
-

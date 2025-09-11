@@ -346,7 +346,11 @@ h6,
 
 
 /*** Classes ***/
-.classes-item {
+.classes-.container-xxl img {
+    max-width: 100%;
+    height: auto;
+}
+item {
     transition: .5s;
 }
 

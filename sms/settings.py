@@ -32,7 +32,8 @@ ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
     'webportal',
-    'TMS',    
+    'TMS',
+    'notification',
     'admin_interface',
     'colorfield',
     'django.contrib.admin',
@@ -251,5 +252,7 @@ CKEDITOR_5_CONFIGS = {
 CKEDITOR_5_FILE_UPLOAD_PERMISSION = "staff"  # Possible values: "staff", "authenticated", "any"
 CKEDITOR_5_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
 CKEDITOR_5_FILE_TYPES = ['pdf', 'doc', 'docx']
-CKEDITOR_5_UPLOAD_FILE_TYPES = ['pdf', 'doc', 'docx']
+CKEDITOR_5_UPLOAD_FILE_TYPES = ['pdf', 'doc', 'docx', 'jpeg', 'jpg', 'png', 'gif']
+
 CKEDITOR_5_UPLOAD_PATH = "uploads/"
+CKEDITOR_5_IMAGE_UPLOAD_PATH = "images/"

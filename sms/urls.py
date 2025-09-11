@@ -24,6 +24,7 @@ urlpatterns = [
     path('', include('webportal.urls')),
     path('tms/', include('TMS.urls')),   
     path("ckeditor5/", include('django_ckeditor_5.urls')),
+    path('', include('notification.urls')),
 ]
 
 # Serve media files during development

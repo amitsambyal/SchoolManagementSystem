@@ -9,6 +9,14 @@
         margin-right: auto;
         margin-bottom: 0.5rem;
 }
+
+/* General rule for responsive images within the homework description */
+.responsive-description img {
+    max-width: 100%;
+    height: auto !important; /* Use !important to override potential inline styles from CKEditor */
+    width: auto !important;
+}
+
 /* Mobile-specific adjustments */
 @media (max-width: 768px) {
     .change-list #result_list th,

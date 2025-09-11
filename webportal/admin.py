@@ -54,7 +54,7 @@ class StudentAdmin(admin.ModelAdmin):
     list_display = ( 'name','image_tag','roll_no','pen_number')
     readonly_fields = ('image_tag',)
     list_filter = ('school_class',)
-    search_fields = ('name', 'roll_no')
+    search_fields = ('name', 'roll_no','pen_number')
     
     class Media:
         css = {
@@ -75,15 +75,21 @@ class StudentAdmin(admin.ModelAdmin):
     
     def image_tag(self, obj):
         if obj.image:
-            return format_html('<img src="{}" width="60" height="60" style="border-radius:8px;margin-bottom:4px;" />', obj.image.url)
+            return format_html('<a href="{0}" target="_blank"><img src="{0}" style="max-width: 100px; max-height: 100px;" /></a>', obj.image.url)
         return "-"
     image_tag.short_description = 'Image'
+
 
     def age_display(self, obj):
         return obj.age
     age_display.short_description = 'Age'    
     
     def changelist_view(self, request, extra_context=None):
+        if hasattr(request.user, 'student_profile'):
+            # Redirect to the custom profile view
+            student = request.user.student_profile
+            return redirect('admin:webportal_student_change', object_id=student.pk)
+
         extra_context = extra_context or {}
         extra_context['show_print_button'] = True
         return super().changelist_view(request, extra_context=extra_context)
@@ -148,6 +154,27 @@ class StudentAdmin(admin.ModelAdmin):
             return [f for f in fields if f != 'school_class'] + ['school_class']
         return fields
 
+    def get_readonly_fields(self, request, obj=None):
+        if obj and not request.user.is_superuser:
+            # If an object is being viewed and the user is not a superuser, all fields are readonly
+            return [f.name for f in self.model._meta.get_fields()]
+        return self.readonly_fields
+
+    def has_change_permission(self, request, obj=None):
+        # Only superusers can change student information
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        # Superusers and teachers can view all students
+        if request.user.is_superuser or hasattr(request.user, 'teacher_profile'):
+            return True
+       
+    
+    def has_delete_permission(self, request, obj=None):
+        # Only superusers can change student information
+        return request.user.is_superuser
+
+    
 
 class CustomSubjectListFilter(RelatedFieldListFilter):
     def field_choices(self, field, request, model_admin):
@@ -315,9 +342,10 @@ class TeacherAdmin(admin.ModelAdmin):
     
     def image_tag(self, obj):
         if obj.profile_picture:
-            return format_html('<img src="{}" width="60" height="60" style="border-radius:8px;margin-bottom:4px;" />', obj.profile_picture.url)
+            return format_html('<a href="{0}" target="_blank"><img src="{0}" style="max-width: 100px; max-height: 100px;" /></a>', obj.profile_picture.url)
         return "-"
     image_tag.short_description = 'Image'
+
     
     def changelist_view(self, request, extra_context=None):
         extra_context = extra_context or {}
@@ -621,9 +649,14 @@ class AttendanceInlineFormSet(BaseInlineFormSet):
 
 @admin.register(Attendance)
 class AttendanceAdmin(admin.ModelAdmin):
-    list_display = ('student', 'school_class', 'date', 'status', 'marked_by', 'marked_at')
+    def get_list_display(self, request):
+        if hasattr(request.user, 'student_profile'):
+            return ('date', 'status', 'marked_by')
+        return ('student', 'school_class', 'date', 'status', 'marked_by', 'marked_at')
+
     list_filter = (
         'school_class',
+
         ('date', DateFieldListFilter),
         'status',
     )
@@ -637,9 +670,22 @@ class AttendanceAdmin(admin.ModelAdmin):
         if hasattr(request.user, 'teacher_profile'):
             # Only allow class teacher to view attendance for their class
             return qs.filter(school_class__class_teacher=request.user.teacher_profile)
+        if hasattr(request.user, 'student_profile'):
+            return qs.filter(student=request.user.student_profile)
         return qs.none()
 
+    def get_list_filter(self, request):
+        if hasattr(request.user, 'student_profile'):
+            return (('date', DateFieldListFilter), 'status')
+        return super().get_list_filter(request)
+
+    def get_readonly_fields(self, request, obj=None):
+        if hasattr(request.user, 'student_profile'):
+            return [f.name for f in self.model._meta.fields]
+        return super().get_readonly_fields(request, obj)
+
     def get_form(self, request, obj=None, **kwargs):
+
         form = super().get_form(request, obj, **kwargs)
         if hasattr(request.user, 'teacher_profile'):
             school_classes = SchoolClass.objects.filter(class_teacher=request.user.teacher_profile)
@@ -695,7 +741,12 @@ class AttendanceAdmin(admin.ModelAdmin):
             return obj.school_class.class_teacher == request.user.teacher_profile
         return False
 
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+
     def get_actions(self, request):
+
         actions = super().get_actions(request)
         if request.user.is_superuser:
             return actions
