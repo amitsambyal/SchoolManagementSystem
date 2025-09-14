@@ -168,27 +168,66 @@
 					<span class="stat-title">Homeworks</span>
 				</div>
 			</div>
+			<div style="margin-bottom:1rem;"><strong>User Management</strong></div>
 			<a href="/admin/auth/user/">Manage Users</a>
 			<a href="/admin/webportal/student/">Manage Students</a>
 			<a href="/admin/webportal/teacher/">Manage Teachers</a>
+			
+
+			<div style="margin-bottom:1rem;margin-top:1rem;"><strong>Academic</strong></div>
 			<a href="/admin/webportal/schoolclass/">Manage Classes</a>
+			<a href="/admin/webportal/subject/">Subjects</a>
+			<a href="/admin/webportal/homework/">Homeworks</a>
+			<a href="/admin/webportal/timetable/">Timetable</a>
+			<a href="/admin/webportal/syllabus/">Syllabus</a>
 			<a href="/admin/webportal/attendance/">Attendance</a>
+
+			<div style="margin-bottom:1rem;margin-top:1rem;"><strong>School Info & Content</strong></div>
+			<a href="/admin/webportal/aboutus/">About Us</a>
+			<a href="/admin/webportal/testimonial/">Testimonials</a>
+			<a href="/admin/webportal/calltoaction/">Call To Action</a>
+			<a href="/admin/webportal/carouselitem/">Carousel Items</a>
+			<a href="/admin/webportal/schoolfacility/">School Facilities</a>
+			<a href="/admin/webportal/teammember/">Team Members</a>
+
+			<div style="margin-bottom:1rem;margin-top:1rem;"><strong>Footer & Social</strong></div>
+			<a href="/admin/webportal/footernewsletter/">Footer Newsletter</a>
+			<a href="/admin/webportal/footersociallink/">Footer Social Links</a>
+
+			<div style="margin-bottom:1rem;margin-top:1rem;"><strong>Transport Management System</strong></div>
+			<a href="/admin/TMS/">Transport Dashboard</a>
+			<a href="/admin/TMS/vehicle/">Vehicles</a>
+			<a href="/admin/TMS/driver/">Drivers</a>
+			<a href="/admin/TMS/route/">Routes</a>
+			<a href="/admin/TMS/meterreading/">Meter Reading</a>
+			<a href="/admin/TMS/assignment/">Assignments</a>
 		</div>
 	{% elif request.user.teacher_profile %}
 		<div class="dashboard-card">
 			<h2>Teacher Dashboard</h2>
 			<p>View and manage your classes, students, and homework.</p>
+			<div style="margin-bottom:1rem;"><strong>Academic</strong></div>
 			<a href="/admin/webportal/student/">View Students</a>
 			<a href="/admin/webportal/homework/">Homework</a>
 			<a href="/admin/webportal/attendance/">Attendance</a>
-		</div>
+			<a href="/admin/webportal/timetable/">Timetable</a>
+			<a href="/admin/webportal/syllabus/">Syllabus</a>
+			<a href="/admin/webportal/subject/">Subjects</a>
+
+			</div>
 	{% elif request.user.student_profile %}
 		<div class="dashboard-card">
 			<h2>Student Dashboard</h2>
 			<p>Welcome, {{ request.user.student_profile.name }}!</p>
+			<div style="margin-bottom:1rem;"><strong>Academic</strong></div>
 			<a href="{% url 'admin:webportal_student_change' request.user.student_profile.pk %}">View My Profile</a>
 			<a href="/admin/webportal/homework/">My Homework</a>
 			<a href="/admin/webportal/attendance/">My Attendance</a>
+			<a href="/admin/webportal/timetable/">Timetable</a>
+			<a href="/admin/webportal/syllabus/">Syllabus</a>
+
+			<div style="margin-bottom:1rem;margin-top:1rem;"><strong>School Info & Content</strong></div>
+			<a href="/admin/webportal/testimonial/">Testimonials</a>
 		</div>
 	{% else %}
 		<div class="dashboard-card">
