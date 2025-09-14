@@ -33,7 +33,6 @@ ALLOWED_HOSTS = ['*']
 INSTALLED_APPS = [
     'webportal',
     'TMS',
-    'notification',
     'admin_interface',
     'colorfield',
     'django.contrib.admin',
