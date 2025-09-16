@@ -1,7 +1,7 @@
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from .models import favicon, logo, CarouselItem, SchoolClass, SchoolFacility, AboutUs, CallToAction, \
-      Teacher, Appointment, TeamMember, Testimonial, FooterNewsletter, FooterSocialLink, SchoolClass, Syllabus, Subject
+      Teacher, Appointment, TeamMember, Testimonial, FooterNewsletter, FooterSocialLink, SchoolClass, Syllabus, Subject,Student
 from django.contrib.auth import login
 from django.contrib.auth.views import LoginView
 from django.shortcuts import redirect
@@ -87,3 +87,9 @@ def get_subjects_by_class(request, class_id):
     subjects = school_class.subjects.all()
     subject_data = [{'id': subject.id, 'name': subject.name} for subject in subjects]
     return JsonResponse({'subjects': subject_data})
+
+def student_count_api(request):
+    return JsonResponse({'count': Student.objects.count()})
+
+def teacher_count_api(request):
+    return JsonResponse({'count': Teacher.objects.count()})

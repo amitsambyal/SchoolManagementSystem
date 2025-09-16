@@ -149,24 +149,15 @@
 			<div class="stats-row">
 				<div class="stat-card">
 					<span class="stat-icon">👨‍🎓</span>
-					<span class="stat-value">{{ webportal.models.Student.objects.count }}</span>
+					<span id="student_count" class="stat-value"></span>
 					<span class="stat-title">Students</span>
 				</div>
 				<div class="stat-card">
 					<span class="stat-icon">👩‍🏫</span>
-					<span class="stat-value">{{ webportal.models.Teacher.objects.count }}</span>
+					<span id="teacher_count" class="stat-value"></span>
 					<span class="stat-title">Teachers</span>
 				</div>
-				<div class="stat-card">
-					<span class="stat-icon">🏫</span>
-					<span class="stat-value">{{ webportal.models.SchoolClass.objects.count }}</span>
-					<span class="stat-title">Classes</span>
-				</div>
-				<div class="stat-card">
-					<span class="stat-icon">📚</span>
-					<span class="stat-value">{{ webportal.models.Homework.objects.count }}</span>
-					<span class="stat-title">Homeworks</span>
-				</div>
+				
 			</div>
 			<div style="margin-bottom:1rem;"><strong>User Management</strong></div>
 			<a href="/admin/auth/user/">Manage Users</a>
@@ -181,6 +172,7 @@
 			<a href="/admin/webportal/timetable/">Timetable</a>
 			<a href="/admin/webportal/syllabus/">Syllabus</a>
 			<a href="/admin/webportal/attendance/">Attendance</a>
+			<a href="/admin/webportal/studentdiary/">Student Diary</a>
 
 			<div style="margin-bottom:1rem;margin-top:1rem;"><strong>School Info & Content</strong></div>
 			<a href="/admin/webportal/aboutus/">About Us</a>
@@ -213,6 +205,7 @@
 			<a href="/admin/webportal/timetable/">Timetable</a>
 			<a href="/admin/webportal/syllabus/">Syllabus</a>
 			<a href="/admin/webportal/subject/">Subjects</a>
+			<a href="/admin/webportal/studentdiary/">Student Diary</a>
 
 			</div>
 	{% elif request.user.student_profile %}
@@ -225,6 +218,7 @@
 			<a href="/admin/webportal/attendance/">My Attendance</a>
 			<a href="/admin/webportal/timetable/">Timetable</a>
 			<a href="/admin/webportal/syllabus/">Syllabus</a>
+			<a href="/admin/webportal/studentdiary/">Student Diary</a>
 
 			<div style="margin-bottom:1rem;margin-top:1rem;"><strong>School Info & Content</strong></div>
 			<a href="/admin/webportal/testimonial/">Testimonials</a>
@@ -236,5 +230,25 @@
 		</div>
 	{% endif %}
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  fetch('/api/student-count/')
+    .then(response => response.json())
+    .then(data => {
+      const el = document.getElementById('student_count');
+      if (el) {
+        el.innerText = data.count;
+      }
+    });
 
+  fetch('/api/teacher-count/')
+	.then(response => response.json())
+	.then(data => {
+	  const el = document.getElementById('teacher_count');
+	  if (el) {
+		el.innerText = data.count;
+	  }
+	});
+});
+</script>
 {% endblock %}
